@@ -42,6 +42,48 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DOCX_EXPORT_SUBDIR = Path("Materials") / "Тесты Docx"
 
 
+def pixmap_from_icon_file(icon_file: Path, target_side: int = 20) -> QPixmap:
+    """
+    Растровые форматы — через QPixmap.
+    SVG — через QSvgRenderer: на части систем QPixmap не подхватывает SVG-плагин, иконки пропадают.
+    """
+    if not icon_file.exists():
+        return QPixmap()
+    pix = QPixmap(str(icon_file))
+    if not pix.isNull():
+        return pix.scaled(
+            target_side,
+            target_side,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+    if icon_file.suffix.lower() != ".svg":
+        return QPixmap()
+    try:
+        from PySide6.QtSvg import QSvgRenderer
+
+        renderer = QSvgRenderer(str(icon_file))
+        if not renderer.isValid():
+            return QPixmap()
+        sz = renderer.defaultSize()
+        if sz.width() <= 0 or sz.height() <= 0:
+            return QPixmap()
+        pm = QPixmap(sz)
+        pm.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pm)
+        renderer.render(painter)
+        painter.end()
+        return pm.scaled(
+            target_side,
+            target_side,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+    except Exception as e:
+        logger.warning("Не удалось загрузить SVG-иконку %s: %s", icon_file, e)
+        return QPixmap()
+
+
 def default_docx_export_dir() -> str:
     """Папка экспорта по умолчанию: AI_Helper/Materials/Тесты Docx."""
     d = REPO_ROOT / DEFAULT_DOCX_EXPORT_SUBDIR
@@ -61,9 +103,12 @@ def icon_path(name: str) -> str:
 def load_icon(name: str) -> QIcon:
     """Создаёт QIcon из файла в assets/icons."""
     p = ICONS_DIR / name
-    if p.exists():
-        return QIcon(str(p))
-    return QIcon()
+    if not p.exists():
+        return QIcon()
+    if p.suffix.lower() == ".svg":
+        pm = pixmap_from_icon_file(p, 64)
+        return QIcon(pm) if not pm.isNull() else QIcon()
+    return QIcon(str(p))
 
 
 _LOGO_CACHE: dict[tuple, QPixmap] = {}
@@ -2747,11 +2792,9 @@ class HomePage(QWidget):
         head = QHBoxLayout()
         head.setSpacing(8)
         icon_lbl = QLabel()
-        pix = QPixmap(str(ICONS_DIR / icon_name))
+        pix = pixmap_from_icon_file(ICONS_DIR / icon_name, 20)
         if not pix.isNull():
-            icon_lbl.setPixmap(pix.scaled(20, 20,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation))
+            icon_lbl.setPixmap(pix)
         name_lbl = QLabel(name)
         name_lbl.setStyleSheet(f"""
             QLabel {{
