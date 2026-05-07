@@ -1,0 +1,32 @@
+# Python
+.venv/
+venv/
+**/.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Локальные модели (GGUF) — скачиваются отдельно
+*.gguf
+models/
+
+# Учебники (тяжёлые PDF) — не для GitHub; пути задаются в textbooks.json
+Materials/Учебники/*.pdf
+
+# Кэш RAG (пересобирается из PDF)
+Test_generator/data/rag_indexes/
+
+# Локальные ярлыки и кэш приложения (на каждом ПК создаются заново)
+Test_generator/data/config.json
+Test_generator/data/gen_cache/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
