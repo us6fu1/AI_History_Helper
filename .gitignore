@@ -14,8 +14,8 @@ build/
 *.gguf
 models/
 
-# Учебники (тяжёлые PDF) — не для GitHub; пути задаются в textbooks.json
-Materials/Учебники/*.pdf
+# PDF в Materials (любой регистр пути к «учебникам») — не для GitHub
+Materials/**/*.pdf
 
 # Кэш RAG (пересобирается из PDF)
 Test_generator/data/rag_indexes/
