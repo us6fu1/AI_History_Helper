@@ -1,6 +1,10 @@
 """
 Загрузка и вызов локальной GGUF-модели (llama-cpp-python).
+<<<<<<< HEAD
 По умолчанию авто: CPU-потоки подбираются по ядрам, NVIDIA GPU включается при подходящей сборке.
+=======
+По умолчанию CPU: n_gpu_layers=0; при сборке с GPU — значение из UI или HISTORY_TEST_N_GPU_LAYERS.
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
 """
 import os
 import sys
@@ -8,7 +12,10 @@ import json
 import re
 import time
 import logging
+<<<<<<< HEAD
 import subprocess
+=======
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
 from pathlib import Path
 from typing import Optional, Callable
 
@@ -16,7 +23,10 @@ logger = logging.getLogger(__name__)
 
 # Размер контекста по умолчанию (llama.cpp / GGUF): промпт + ответ.
 DEFAULT_N_CTX = 8000
+<<<<<<< HEAD
 AUTO_N_GPU_LAYERS = -2
+=======
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
 
 
 def detect_logical_cores() -> int:
@@ -81,6 +91,7 @@ def detect_physical_cores() -> int:
     return max(1, logical // 2 if logical > 4 else logical)
 
 
+<<<<<<< HEAD
 def choose_auto_cpu_threads() -> int:
     """
     Автоподбор потоков генерации для llama.cpp.
@@ -257,6 +268,8 @@ def choose_auto_gpu_layers() -> int:
     return 0
 
 
+=======
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
 def detect_chat_format(model_path: str) -> Optional[str]:
     """
     Подбирает chat_format по имени файла модели.
@@ -300,14 +313,24 @@ def detect_chat_format(model_path: str) -> Optional[str]:
 class ModelRunner:
     """
     Обёртка над llama-cpp-python для запуска GGUF-моделей.
+<<<<<<< HEAD
     По умолчанию — авто: CPU-потоки по ядрам, NVIDIA GPU при подходящей сборке.
+=======
+    По умолчанию — CPU; при n_gpu_layers≠0 (и сборке с CUDA/Vulkan) часть слоёв на GPU.
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
     Оптимизирована для Qwen3.5-4B / Qwen3-4B / Qwen2.5-3B (Q4_K_M).
     """
 
     DEFAULT_PARAMS = {
+<<<<<<< HEAD
         "n_ctx": None,             # None → авто по оперативной памяти устройства
         "n_threads": None,       # None → авто (физические ядра)
         "n_gpu_layers": AUTO_N_GPU_LAYERS,  # -2 = авто; 0 = CPU; -1 = все слои на GPU
+=======
+        "n_ctx": DEFAULT_N_CTX,     # достаточно места под RAG-контекст и ответ
+        "n_threads": None,       # None → авто (физические ядра)
+        "n_gpu_layers": 0,       # 0 = только CPU; при CUDA/Vulkan >0 или -1 (все)
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
         "n_batch": 768,          # 768 — sweet-spot между ускорением prompt
                                  # processing и memory-bound потолком на DDR4.
         "n_ubatch": 768,         # micro-batch такой же для согласованности.
@@ -328,7 +351,11 @@ class ModelRunner:
         self.is_loaded: bool = False
         self.params: dict = dict(self.DEFAULT_PARAMS)
         self.using_gpu: bool = False
+<<<<<<< HEAD
         # Поддержка GPU зависит не только от видеокарты, но и от сборки llama-cpp-python.
+=======
+        # CPU-конфигурация: GPU-поддержку не детектим и не используем.
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
         self.gpu_supported: bool = False
         # Сохранённые kwargs последней загрузки — для безопасного
         # «горячего» rebuild без draft_model при ошибке spec-decoding.
@@ -344,7 +371,11 @@ class ModelRunner:
         model_path: str,
         n_ctx: Optional[int] = None,
         n_threads: Optional[int] = None,
+<<<<<<< HEAD
         n_gpu_layers: int = AUTO_N_GPU_LAYERS,
+=======
+        n_gpu_layers: int = 0,
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
         n_batch: int = 768,
         n_ubatch: int = 768,
         use_mmap: bool = True,
@@ -353,12 +384,21 @@ class ModelRunner:
         **_ignored,
     ) -> bool:
         """
+<<<<<<< HEAD
         Загружает GGUF-модель. Возвращает True при успехе.
 
         Аргументы:
             n_ctx: размер контекстного окна. None → авто по RAM устройства.
             n_threads: число потоков. None → физические ядра.
             n_gpu_layers: -2 = авто; 0 = CPU; -1 часто означает «все слои» в llama.cpp.
+=======
+        Загружает GGUF-модель в CPU-режиме. Возвращает True при успехе.
+
+        Аргументы:
+            n_ctx: размер контекстного окна (None → DEFAULT_N_CTX, для RAG обычно ≥ 4096).
+            n_threads: число потоков. None → физические ядра.
+            n_gpu_layers: число слоёв на GPU (-1 часто означает «все слои» в llama.cpp).
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
                 Переменная окружения HISTORY_TEST_N_GPU_LAYERS переопределяет это значение.
             n_batch: размер батча. На CPU 128–256 — оптимум.
             use_mmap: True — модель грузится через mmap (мгновенный старт).
@@ -368,7 +408,11 @@ class ModelRunner:
         тихо игнорируются — это CPU-сборка.
         """
         if n_ctx is None:
+<<<<<<< HEAD
             n_ctx = choose_auto_context_tokens()
+=======
+            n_ctx = DEFAULT_N_CTX
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
 
         if not os.path.exists(model_path):
             raise FileNotFoundError(
@@ -428,6 +472,7 @@ class ModelRunner:
         try:
             n_gl = int(n_gpu_layers)
         except (TypeError, ValueError):
+<<<<<<< HEAD
             n_gl = AUTO_N_GPU_LAYERS
         env_gl = os.environ.get("HISTORY_TEST_N_GPU_LAYERS")
         auto_gpu = n_gl == AUTO_N_GPU_LAYERS
@@ -439,6 +484,15 @@ class ModelRunner:
                 pass
         if auto_gpu:
             n_gl = choose_auto_gpu_layers()
+=======
+            n_gl = 0
+        env_gl = os.environ.get("HISTORY_TEST_N_GPU_LAYERS")
+        if env_gl is not None and str(env_gl).strip() != "":
+            try:
+                n_gl = int(str(env_gl).strip())
+            except ValueError:
+                pass
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
 
         # Авто-выбор числа потоков:
         #   по умолчанию — физические ядра (для llama.cpp обычно оптимум).
@@ -447,9 +501,16 @@ class ModelRunner:
         # Управляется ENV: HISTORY_TEST_USE_LOGICAL=1 → берём логические.
         physical = detect_physical_cores()
         logical = detect_logical_cores()
+<<<<<<< HEAD
 
         if n_threads is None or n_threads <= 0:
             n_threads = choose_auto_cpu_threads()
+=======
+        use_logical = os.environ.get("HISTORY_TEST_USE_LOGICAL", "0") == "1"
+
+        if n_threads is None or n_threads <= 0:
+            n_threads = logical if use_logical else physical
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
         n_threads = max(1, int(n_threads))
 
         # n_threads_batch (для prompt processing) выгоднее держать = логическим
@@ -474,6 +535,7 @@ class ModelRunner:
 
         if progress_callback:
             spec_str = "spec=ON" if draft_model is not None else "spec=off"
+<<<<<<< HEAD
             gpu_names = detect_nvidia_gpus()
             gpu_note = ""
             if auto_gpu:
@@ -484,6 +546,11 @@ class ModelRunner:
             backend = f"GPU n_gpu_layers={n_gl}" if n_gl != 0 else "CPU"
             progress_callback(
                 f"Загрузка модели… [{backend}{gpu_note} · ядра физ./лог.={physical}/{logical} · "
+=======
+            backend = f"GPU n_gpu_layers={n_gl}" if n_gl != 0 else "CPU"
+            progress_callback(
+                f"Загрузка модели… [{backend} · ядра физ./лог.={physical}/{logical} · "
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
                 f"генерация={n_threads} пот · prompt={n_threads_batch} пот · "
                 f"n_batch={n_batch} · n_ctx={n_ctx} · {spec_str}]"
             )
@@ -505,6 +572,7 @@ class ModelRunner:
         if draft_model is not None:
             kwargs["draft_model"] = draft_model
 
+<<<<<<< HEAD
         def instantiate_llama(run_kwargs: dict):
             try:
                 return Llama(**run_kwargs), run_kwargs
@@ -535,6 +603,22 @@ class ModelRunner:
                 raise
         self.using_gpu = n_gl != 0
         self.gpu_supported = llama_supports_gpu_offload()
+=======
+        t0 = time.time()
+        try:
+            self.llm = Llama(**kwargs)
+        except TypeError as e:
+            # Старая версия llama-cpp без n_threads_batch / n_ubatch / draft_model:
+            # выкидываем неподдерживаемые ключи и пробуем ещё раз.
+            logger.warning(f"Старая версия llama-cpp, упрощаю параметры: {e}")
+            for key in ("n_threads_batch", "n_ubatch", "use_mmap",
+                        "use_mlock", "draft_model"):
+                kwargs.pop(key, None)
+            self.llm = Llama(**kwargs)
+            self.params["speculative"] = False
+        self.using_gpu = n_gl != 0
+        self.gpu_supported = n_gl != 0
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
 
         elapsed = time.time() - t0
         self.model_path = model_path
@@ -556,10 +640,29 @@ class ModelRunner:
             f"n_batch={n_batch}, {spec_label})"
         )
 
+<<<<<<< HEAD
         # Сохраняем фактически принятые kwargs (БЕЗ draft_model) — для возможной
         # «горячей» перезагрузки без spec-decoding при runtime-ошибке.
         self._last_load_kwargs = dict(kwargs)
         self._last_load_kwargs.pop("draft_model", None)
+=======
+        # Сохраняем kwargs (БЕЗ draft_model) — для возможной «горячей»
+        # перезагрузки без spec-decoding при runtime-ошибке.
+        self._last_load_kwargs = {
+            "model_path": model_path,
+            "n_ctx": n_ctx,
+            "n_threads": n_threads,
+            "n_threads_batch": n_threads_batch,
+            "n_gpu_layers": n_gl,
+            "n_batch": n_batch,
+            "n_ubatch": n_ubatch,
+            "use_mmap": use_mmap,
+            "use_mlock": use_mlock,
+            "verbose": False,
+        }
+        if chat_format:
+            self._last_load_kwargs["chat_format"] = chat_format
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
         return True
 
     def _reload_without_speculative(self) -> bool:
@@ -1121,25 +1224,39 @@ class ModelRegistry:
             cfg["last_model"] = path
             if n_gpu_layers is not None:
                 cfg["last_n_gpu_layers"] = int(n_gpu_layers)
+<<<<<<< HEAD
                 cfg["last_gpu_layers_auto"] = int(n_gpu_layers) == AUTO_N_GPU_LAYERS
+=======
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
             with open(config_file, "w", encoding="utf-8") as f:
                 json.dump(cfg, f, ensure_ascii=False)
         except Exception:
             pass
 
     def get_last_n_gpu_layers(self) -> int:
+<<<<<<< HEAD
         """Последняя настройка GPU-слоёв (-2 = авто, 0 = только CPU)."""
+=======
+        """Последнее сохранённое число GPU-слоёв (0 = только CPU)."""
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
         config_file = os.path.join(os.path.dirname(self.REGISTRY_FILE), "config.json")
         try:
             if os.path.exists(config_file):
                 with open(config_file, "r", encoding="utf-8") as f:
                     cfg = json.load(f)
+<<<<<<< HEAD
                 if cfg.get("last_gpu_layers_auto", True):
                     return AUTO_N_GPU_LAYERS
                 return int(cfg.get("last_n_gpu_layers", 0))
         except Exception:
             pass
         return AUTO_N_GPU_LAYERS
+=======
+                return int(cfg.get("last_n_gpu_layers", 0))
+        except Exception:
+            pass
+        return 0
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
 
     def get_last_model_path(self) -> Optional[str]:
         config_file = os.path.join(os.path.dirname(self.REGISTRY_FILE), "config.json")

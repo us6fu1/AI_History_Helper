@@ -115,7 +115,11 @@ class QuestionGenerator:
     ) -> dict:
         mp, mm, ms = _file_fingerprint(getattr(self.model, "model_path", "") or "")
         return {
+<<<<<<< HEAD
             "schema": 4,
+=======
+            "schema": 3,
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
             "topic": topic.strip().lower(),
             "question_type": question_type,
             "count": int(count),

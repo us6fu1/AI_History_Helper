@@ -40,7 +40,10 @@ LOGO_PATH = ASSETS_DIR / "logo.png"
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DOCX_EXPORT_SUBDIR = Path("Materials") / "Тесты Docx"
+<<<<<<< HEAD
 EXTERNAL_MODELS_DIR = Path.home() / "Documents" / "ИИ-помощник учителя" / "Модели"
+=======
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
 
 
 def pixmap_from_icon_file(icon_file: Path, target_side: int = 20) -> QPixmap:
@@ -205,12 +208,17 @@ def app_icon() -> QIcon:
     16×16 … 256×256 (один файл .ico с одним кадром Qt иногда «теряется» как
     программная ассоциация к python.exe).
     """
+<<<<<<< HEAD
     app_ico_file = ASSETS_DIR / "app.ico"
     fallback_ico_file = ASSETS_DIR / "logo.ico"
+=======
+    ico_file = ASSETS_DIR / "logo.ico"
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
     icon = QIcon()
 
     sizes = (16, 20, 24, 32, 40, 48, 64, 128, 256)
 
+<<<<<<< HEAD
     if app_ico_file.exists():
         loaded = QIcon(str(app_ico_file))
         if not loaded.isNull():
@@ -221,6 +229,8 @@ def app_icon() -> QIcon:
         if not loaded.isNull():
             return loaded
 
+=======
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
     def append_from_png(path: Path) -> bool:
         nonlocal icon
         if not path.exists():
@@ -251,6 +261,14 @@ def app_icon() -> QIcon:
     if append_from_png(LOGO_PATH):
         return icon
 
+<<<<<<< HEAD
+=======
+    if ico_file.exists():
+        loaded = QIcon(str(ico_file))
+        if not loaded.isNull():
+            return loaded
+
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
     if append_from_png(ASSETS_DIR / "logo_old_backup.png"):
         return icon
 
@@ -714,9 +732,15 @@ class ModelLoadWorker(QThread):
         self,
         runner,
         path: str,
+<<<<<<< HEAD
         n_ctx: Optional[int] = None,
         n_threads: Optional[int] = None,
         n_gpu_layers: int = -2,
+=======
+        n_ctx: int,
+        n_threads: int,
+        n_gpu_layers: int = 0,
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
         n_batch: int = 256,
     ):
         super().__init__()
@@ -1087,14 +1111,22 @@ class ModelSettingsPage(QWidget):
         outer.addStretch()
 
         # --- Выбор модели ---
+<<<<<<< HEAD
         model_group = QGroupBox("Внешняя GGUF-модель")
+=======
+        model_group = QGroupBox("GGUF-модель")
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
         model_lay = QVBoxLayout(model_group)
         model_lay.setSpacing(8)
 
         # Путь к файлу
         path_row = QHBoxLayout()
         self.path_edit = QLineEdit()
+<<<<<<< HEAD
         self.path_edit.setPlaceholderText("Выберите скачанный .gguf файл нейросети...")
+=======
+        self.path_edit.setPlaceholderText("Путь к .gguf файлу...")
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
         self.path_edit.setStyleSheet(STYLE_INPUT)
 
         last = self.registry.get_last_model_path()
@@ -1112,10 +1144,16 @@ class ModelSettingsPage(QWidget):
 
         # Подсказка
         hint = QLabel(
+<<<<<<< HEAD
             "Нейросеть не входит в приложение и хранится отдельным .gguf файлом.\n"
             "1. Скачайте модель GGUF с Hugging Face, например Qwen2.5-3B-Instruct-Q4_K_M.gguf или Qwen2.5-7B-Instruct-Q4_K_M.gguf.\n"
             f"2. Положите файл в папку: {EXTERNAL_MODELS_DIR}\n"
             "3. Нажмите «Обзор», выберите .gguf файл и нажмите «Загрузить модель»."
+=======
+            "Рекомендуется: Qwen3.5-4B.Q4_K_M.gguf (~2.5 GB) — лучший баланс на CPU\n"
+            "Запасные варианты: Qwen2.5-3B-Instruct (~2 GB) или Qwen2.5-7B-Instruct (~4.5 GB)\n"
+            "Файлы лежат в подпапке models/ проекта."
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
         )
         hint.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 11px; background: transparent; border: none;")
         hint.setWordWrap(True)
@@ -1128,6 +1166,7 @@ class ModelSettingsPage(QWidget):
         params_lay = QFormLayout(params_group)
         params_lay.setSpacing(10)
 
+<<<<<<< HEAD
         # Авто-режим оставляет подбор железа загрузчику модели.
         from model_runner import AUTO_N_GPU_LAYERS
         self._auto_gpu_layers = AUTO_N_GPU_LAYERS
@@ -1170,14 +1209,56 @@ class ModelSettingsPage(QWidget):
             ("Контекст:", self.ctx_value_label),
             ("Потоки CPU:", self.threads_value_label),
             ("GPU:", self.gpu_value_label),
+=======
+        # Авто-определяем число физических ядер для дефолта
+        from model_runner import ModelRunner
+
+        try:
+            from model_runner import detect_physical_cores
+
+            phys_cores = detect_physical_cores()
+        except Exception:
+            phys_cores = max(1, (os.cpu_count() or 4) // 2)
+
+        self.ctx_spin = QSpinBox()
+        self.ctx_spin.setRange(2048, 8192)
+        self.ctx_spin.setValue(ModelRunner.DEFAULT_PARAMS["n_ctx"])
+        self.ctx_spin.setSingleStep(512)
+        self.ctx_spin.setStyleSheet(STYLE_INPUT)
+
+        self.threads_spin = QSpinBox()
+        self.threads_spin.setRange(1, 64)
+        self.threads_spin.setValue(phys_cores)
+        self.threads_spin.setStyleSheet(STYLE_INPUT)
+
+        self.gpu_spin = QSpinBox()
+        self.gpu_spin.setRange(-1, 999)
+        self.gpu_spin.setValue(max(-1, self.registry.get_last_n_gpu_layers()))
+        self.gpu_spin.setToolTip(
+            "−1: все слои на GPU (llama.cpp). 0: только CPU. "
+            "1…N: сколько слоёв выгрузить на GPU."
+        )
+        self.gpu_spin.setStyleSheet(STYLE_INPUT)
+
+        lbl_style = f"color: {COLORS['text_primary']}; font-size: 12px; font-weight: 600; background: transparent; border: none;"
+        for lbl, widget in [
+            ("Контекст (токены):", self.ctx_spin),
+            ("Потоков CPU:", self.threads_spin),
+            ("Слоёв GPU:", self.gpu_spin),
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
         ]:
             label = QLabel(lbl)
             label.setStyleSheet(lbl_style)
             params_lay.addRow(label, widget)
 
         gpu_hint = QLabel(
+<<<<<<< HEAD
             "Параметры железа выбираются автоматически при каждой загрузке модели: контекст — по RAM, "
             "CPU-потоки — по ядрам процессора, GPU — по видеокарте и сборке llama-cpp-python."
+=======
+            "0 или «CPU» — только процессор; −1 — все слои на GPU (нужен llama-cpp с CUDA/Vulkan). "
+            "Переменная HISTORY_TEST_N_GPU_LAYERS переопределяет это при загрузке."
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
         )
         gpu_hint.setWordWrap(True)
         gpu_hint.setStyleSheet(
@@ -1210,7 +1291,10 @@ class ModelSettingsPage(QWidget):
             self.status_label.setStyleSheet(
                 f"color: {COLORS['success']}; font-size: 12px; background: transparent; border: none;"
             )
+<<<<<<< HEAD
             self._update_auto_values_labels()
+=======
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
 
         # --- Кнопки ---
         btn_row = QHBoxLayout()
@@ -1235,6 +1319,7 @@ class ModelSettingsPage(QWidget):
 
         layout.addLayout(btn_row)
 
+<<<<<<< HEAD
     def _update_auto_values_labels(self):
         info = self.runner.model_info() if getattr(self.runner, "is_loaded", False) else {}
         ctx = info.get("n_ctx")
@@ -1282,6 +1367,13 @@ class ModelSettingsPage(QWidget):
             default_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "models")
             if not os.path.exists(default_dir):
                 default_dir = ""
+=======
+    def _browse_model(self):
+        # Путь по умолчанию к папке с моделями
+        default_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "models")
+        if not os.path.exists(default_dir):
+            default_dir = ""
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
         
         path, _ = QFileDialog.getOpenFileName(
             self, "Выберите GGUF-модель", default_dir, "GGUF Files (*.gguf);;All Files (*)"
@@ -1307,9 +1399,15 @@ class ModelSettingsPage(QWidget):
 
         self.worker = ModelLoadWorker(
             self.runner, path,
+<<<<<<< HEAD
             n_ctx=None,
             n_threads=None,
             n_gpu_layers=self._auto_gpu_layers,
+=======
+            n_ctx=self.ctx_spin.value(),
+            n_threads=self.threads_spin.value(),
+            n_gpu_layers=self.gpu_spin.value(),
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
             n_batch=768,
         )
         self.worker.progress.connect(self.progress_label.setText)
@@ -1325,9 +1423,14 @@ class ModelSettingsPage(QWidget):
             )
             self.registry.save_last_model_path(
                 self.path_edit.text().strip(),
+<<<<<<< HEAD
                 n_gpu_layers=self._auto_gpu_layers,
             )
             self._update_auto_values_labels()
+=======
+                n_gpu_layers=self.gpu_spin.value(),
+            )
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
             self.unload_btn.setEnabled(True)
         self.load_btn.setEnabled(True)
         self.progress_label.setText("")
@@ -1346,7 +1449,10 @@ class ModelSettingsPage(QWidget):
         self.status_label.setStyleSheet(
             f"color: {COLORS['text_muted']}; font-size: 12px; background: transparent; border: none;"
         )
+<<<<<<< HEAD
         self._update_auto_values_labels()
+=======
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
         self.unload_btn.setEnabled(False)
 
 
@@ -3197,12 +3303,20 @@ class AboutPage(QWidget):
 • Рекомендуемая модель: Qwen2.5-3B/7B-Instruct<br>
 • Экспорт: python-docx (.docx)<br><br>
 <b>Как использовать:</b><br>
+<<<<<<< HEAD
 1. Скачайте GGUF-модель отдельно от приложения<br>
 2. Положите .gguf файл в папку «Документы / ИИ-помощник учителя / Модели» или в любое удобное место<br>
 3. В разделе «Банки вопросов» добавьте папку с JSON<br>
 4. В «Настройки модели» выберите .gguf файл и нажмите «Загрузить»<br>
 5. На главной странице выберите банк, введите тему и нажмите «Сгенерировать тест»<br>
 6. Экспортируйте результат в Word<br><br>
+=======
+1. Скачайте GGUF-модель (например, Qwen2.5-3B-Instruct-Q4_K_M.gguf)<br>
+2. В разделе «Банки вопросов» добавьте папку с JSON<br>
+3. В «Настройки модели» укажите путь к модели и нажмите «Загрузить»<br>
+4. На главной странице выберите банк, введите тему и нажмите «Сгенерировать тест»<br>
+5. Экспортируйте результат в Word<br><br>
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
 <b>Ресурсы для скачивания моделей:</b><br>
 • https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF<br>
 • https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF
@@ -3259,7 +3373,12 @@ class MainWindow(QMainWindow):
         else:
             self.setWindowIcon(app_icon())
         self.setMinimumSize(1180, 760)
+<<<<<<< HEAD
         self.resize(1280, 820)
+=======
+        # Запускаем в полноэкранном режиме
+        self.showMaximized()
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
 
         # Инициализируем компоненты
         self._init_components()
@@ -3583,12 +3702,17 @@ class MainWindow(QMainWindow):
     def _try_auto_load_model(self):
         """
         Пытается автоматически загрузить последнюю использованную модель.
+<<<<<<< HEAD
         GPU/CPU выбираются автоматически, если пользователь не задал ручной режим.
         HISTORY_TEST_N_GPU_LAYERS всё ещё может переопределить GPU-слои.
+=======
+        n_gpu_layers из config.json; может переопределяться HISTORY_TEST_N_GPU_LAYERS.
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
         """
         path = self.model_registry.get_last_model_path()
         if path and os.path.exists(path):
             try:
+<<<<<<< HEAD
                 from model_runner import AUTO_N_GPU_LAYERS
 
                 self.model_runner.load_model(
@@ -3600,6 +3724,15 @@ class MainWindow(QMainWindow):
                 )
                 if hasattr(self, "model_page"):
                     self.model_page._update_auto_values_labels()
+=======
+                self.model_runner.load_model(
+                    path,
+                    n_ctx=self.model_runner.DEFAULT_PARAMS["n_ctx"],
+                    n_threads=None,
+                    n_gpu_layers=self.model_registry.get_last_n_gpu_layers(),
+                    n_batch=256,
+                )
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
             except Exception as e:
                 logger.warning(f"Автозагрузка модели не удалась: {e}")
         self._update_status_bar()

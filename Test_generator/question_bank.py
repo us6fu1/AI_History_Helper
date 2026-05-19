@@ -20,6 +20,7 @@ _STOP = frozenset(
     """
     и в во на не с со к у о об от по за для при из как то а но же ли бы что это
     чтобы или все также только ещё еще их его ее её им
+<<<<<<< HEAD
     древний древняя древнее древнего древней древние древних древним древними
     мир мира миру мире мировой история истории исторический историческая исторические
     """.split()
@@ -75,6 +76,10 @@ _TOPIC_ALIASES: dict[str, tuple[str, ...]] = {
     "еврей": _TOPIC_GROUPS["levant"],
     "первобыт": _TOPIC_GROUPS["primitive"],
 }
+=======
+    """.split()
+)
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
 _TOKEN_RE = re.compile(r"[\w\-]+", re.UNICODE)
 
 
@@ -94,6 +99,7 @@ def _token_set(text: str) -> set[str]:
     return set(_tokens(text))
 
 
+<<<<<<< HEAD
 def _contains_any(text_l: str, needles: tuple[str, ...]) -> bool:
     return any(k in text_l for k in needles)
 
@@ -122,6 +128,8 @@ def _matches_topic_guard(topic_l: str, extra_l: str, blob_l: str) -> bool:
     return any(_contains_any(blob_l, _TOPIC_GROUPS[g]) for g in intents)
 
 
+=======
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
 def _geo_match_multiplier(topic_l: str, blob_l: str) -> float:
     """
     Снижает «утечку» между крупными темами (Левант vs Греция и т.д.), когда общие
@@ -189,6 +197,7 @@ def _geo_match_multiplier(topic_l: str, blob_l: str) -> float:
     if levant_intent and greek_blob and not levant_blob:
         mult *= 0.12
 
+<<<<<<< HEAD
     intents = _topic_groups(topic_l)
     if intents:
         has_target_group = any(_contains_any(blob_l, _TOPIC_GROUPS[g]) for g in intents)
@@ -202,6 +211,8 @@ def _geo_match_multiplier(topic_l: str, blob_l: str) -> float:
             if other_hits:
                 mult *= 0.7
 
+=======
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
     return mult
 
 
@@ -320,7 +331,11 @@ class QuestionBankIndex:
         for m in re.finditer(r"[§]\s*\d+", combined):
             if m.group(0).replace(" ", "") in para.replace(" ", ""):
                 score += 8.0
+<<<<<<< HEAD
         key_toks = _topic_search_terms(topic, extra)
+=======
+        key_toks = _token_set(topic) | _token_set(extra)
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
         if not key_toks:
             return 1.0 + score
         hit = len(key_toks & _token_set(blob_l))
@@ -328,10 +343,13 @@ class QuestionBankIndex:
         for t in key_toks:
             if len(t) >= 5 and t in blob_l:
                 score += 0.35
+<<<<<<< HEAD
         intents = _topic_groups(combined)
         for g in intents:
             if _contains_any(blob_l, _TOPIC_GROUPS[g]):
                 score += 8.0
+=======
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
         score *= _geo_match_multiplier(topic_l, blob_l)
         return max(score, 0.01)
 
@@ -350,6 +368,7 @@ def filter_scored_items(
         else user_difficulty_cap(difficulty_mode)
     )
     scored: list[tuple[float, BankItem]] = []
+<<<<<<< HEAD
     topic_l = topic.lower().strip()
     extra_l = extra.lower().strip()
     for bi in index.questions:
@@ -357,6 +376,11 @@ def filter_scored_items(
             continue
         if not _matches_topic_guard(topic_l, extra_l, bi.search_blob().lower()):
             continue
+=======
+    for bi in index.questions:
+        if question_difficulty_numeric(bi.raw) > cap:
+            continue
+>>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
         sc = QuestionBankIndex.score_item(bi, topic, extra)
         scored.append((sc, bi))
     scored.sort(key=lambda t: -t[0])
