@@ -31,19 +31,18 @@ from PySide6.QtGui import (
     QPen, QBrush, QFontMetrics, QCursor, QFontDatabase,
 )
 
+from app_paths import app_resource_dir, default_export_dir, default_models_dir, repo_resource_dir
+
 logger = logging.getLogger(__name__)
 
 
-ASSETS_DIR = Path(__file__).parent / "assets"
+ASSETS_DIR = app_resource_dir() / "assets"
 ICONS_DIR = ASSETS_DIR / "icons"
 LOGO_PATH = ASSETS_DIR / "logo.png"
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = repo_resource_dir()
 DEFAULT_DOCX_EXPORT_SUBDIR = Path("Materials") / "Тесты Docx"
-<<<<<<< HEAD
-EXTERNAL_MODELS_DIR = Path.home() / "Documents" / "ИИ-помощник учителя" / "Модели"
-=======
->>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
+EXTERNAL_MODELS_DIR = default_models_dir()
 
 
 def pixmap_from_icon_file(icon_file: Path, target_side: int = 20) -> QPixmap:
@@ -90,7 +89,7 @@ def pixmap_from_icon_file(icon_file: Path, target_side: int = 20) -> QPixmap:
 
 def default_docx_export_dir() -> str:
     """Папка экспорта по умолчанию: AI_Helper/Materials/Тесты Docx."""
-    d = REPO_ROOT / DEFAULT_DOCX_EXPORT_SUBDIR
+    d = default_export_dir() if getattr(sys, "frozen", False) else REPO_ROOT / DEFAULT_DOCX_EXPORT_SUBDIR
     try:
         d.mkdir(parents=True, exist_ok=True)
     except OSError:
@@ -208,17 +207,12 @@ def app_icon() -> QIcon:
     16×16 … 256×256 (один файл .ico с одним кадром Qt иногда «теряется» как
     программная ассоциация к python.exe).
     """
-<<<<<<< HEAD
     app_ico_file = ASSETS_DIR / "app.ico"
     fallback_ico_file = ASSETS_DIR / "logo.ico"
-=======
-    ico_file = ASSETS_DIR / "logo.ico"
->>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
     icon = QIcon()
 
     sizes = (16, 20, 24, 32, 40, 48, 64, 128, 256)
 
-<<<<<<< HEAD
     if app_ico_file.exists():
         loaded = QIcon(str(app_ico_file))
         if not loaded.isNull():
@@ -229,8 +223,6 @@ def app_icon() -> QIcon:
         if not loaded.isNull():
             return loaded
 
-=======
->>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
     def append_from_png(path: Path) -> bool:
         nonlocal icon
         if not path.exists():
@@ -261,14 +253,6 @@ def app_icon() -> QIcon:
     if append_from_png(LOGO_PATH):
         return icon
 
-<<<<<<< HEAD
-=======
-    if ico_file.exists():
-        loaded = QIcon(str(ico_file))
-        if not loaded.isNull():
-            return loaded
-
->>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
     if append_from_png(ASSETS_DIR / "logo_old_backup.png"):
         return icon
 
@@ -732,15 +716,9 @@ class ModelLoadWorker(QThread):
         self,
         runner,
         path: str,
-<<<<<<< HEAD
         n_ctx: Optional[int] = None,
         n_threads: Optional[int] = None,
         n_gpu_layers: int = -2,
-=======
-        n_ctx: int,
-        n_threads: int,
-        n_gpu_layers: int = 0,
->>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
         n_batch: int = 256,
     ):
         super().__init__()
@@ -1111,22 +1089,14 @@ class ModelSettingsPage(QWidget):
         outer.addStretch()
 
         # --- Выбор модели ---
-<<<<<<< HEAD
         model_group = QGroupBox("Внешняя GGUF-модель")
-=======
-        model_group = QGroupBox("GGUF-модель")
->>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
         model_lay = QVBoxLayout(model_group)
         model_lay.setSpacing(8)
 
         # Путь к файлу
         path_row = QHBoxLayout()
         self.path_edit = QLineEdit()
-<<<<<<< HEAD
         self.path_edit.setPlaceholderText("Выберите скачанный .gguf файл нейросети...")
-=======
-        self.path_edit.setPlaceholderText("Путь к .gguf файлу...")
->>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
         self.path_edit.setStyleSheet(STYLE_INPUT)
 
         last = self.registry.get_last_model_path()
@@ -1144,16 +1114,10 @@ class ModelSettingsPage(QWidget):
 
         # Подсказка
         hint = QLabel(
-<<<<<<< HEAD
             "Нейросеть не входит в приложение и хранится отдельным .gguf файлом.\n"
             "1. Скачайте модель GGUF с Hugging Face, например Qwen2.5-3B-Instruct-Q4_K_M.gguf или Qwen2.5-7B-Instruct-Q4_K_M.gguf.\n"
             f"2. Положите файл в папку: {EXTERNAL_MODELS_DIR}\n"
             "3. Нажмите «Обзор», выберите .gguf файл и нажмите «Загрузить модель»."
-=======
-            "Рекомендуется: Qwen3.5-4B.Q4_K_M.gguf (~2.5 GB) — лучший баланс на CPU\n"
-            "Запасные варианты: Qwen2.5-3B-Instruct (~2 GB) или Qwen2.5-7B-Instruct (~4.5 GB)\n"
-            "Файлы лежат в подпапке models/ проекта."
->>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
         )
         hint.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 11px; background: transparent; border: none;")
         hint.setWordWrap(True)
@@ -1166,7 +1130,6 @@ class ModelSettingsPage(QWidget):
         params_lay = QFormLayout(params_group)
         params_lay.setSpacing(10)
 
-<<<<<<< HEAD
         # Авто-режим оставляет подбор железа загрузчику модели.
         from model_runner import AUTO_N_GPU_LAYERS
         self._auto_gpu_layers = AUTO_N_GPU_LAYERS
@@ -1209,56 +1172,14 @@ class ModelSettingsPage(QWidget):
             ("Контекст:", self.ctx_value_label),
             ("Потоки CPU:", self.threads_value_label),
             ("GPU:", self.gpu_value_label),
-=======
-        # Авто-определяем число физических ядер для дефолта
-        from model_runner import ModelRunner
-
-        try:
-            from model_runner import detect_physical_cores
-
-            phys_cores = detect_physical_cores()
-        except Exception:
-            phys_cores = max(1, (os.cpu_count() or 4) // 2)
-
-        self.ctx_spin = QSpinBox()
-        self.ctx_spin.setRange(2048, 8192)
-        self.ctx_spin.setValue(ModelRunner.DEFAULT_PARAMS["n_ctx"])
-        self.ctx_spin.setSingleStep(512)
-        self.ctx_spin.setStyleSheet(STYLE_INPUT)
-
-        self.threads_spin = QSpinBox()
-        self.threads_spin.setRange(1, 64)
-        self.threads_spin.setValue(phys_cores)
-        self.threads_spin.setStyleSheet(STYLE_INPUT)
-
-        self.gpu_spin = QSpinBox()
-        self.gpu_spin.setRange(-1, 999)
-        self.gpu_spin.setValue(max(-1, self.registry.get_last_n_gpu_layers()))
-        self.gpu_spin.setToolTip(
-            "−1: все слои на GPU (llama.cpp). 0: только CPU. "
-            "1…N: сколько слоёв выгрузить на GPU."
-        )
-        self.gpu_spin.setStyleSheet(STYLE_INPUT)
-
-        lbl_style = f"color: {COLORS['text_primary']}; font-size: 12px; font-weight: 600; background: transparent; border: none;"
-        for lbl, widget in [
-            ("Контекст (токены):", self.ctx_spin),
-            ("Потоков CPU:", self.threads_spin),
-            ("Слоёв GPU:", self.gpu_spin),
->>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
         ]:
             label = QLabel(lbl)
             label.setStyleSheet(lbl_style)
             params_lay.addRow(label, widget)
 
         gpu_hint = QLabel(
-<<<<<<< HEAD
             "Параметры железа выбираются автоматически при каждой загрузке модели: контекст — по RAM, "
             "CPU-потоки — по ядрам процессора, GPU — по видеокарте и сборке llama-cpp-python."
-=======
-            "0 или «CPU» — только процессор; −1 — все слои на GPU (нужен llama-cpp с CUDA/Vulkan). "
-            "Переменная HISTORY_TEST_N_GPU_LAYERS переопределяет это при загрузке."
->>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
         )
         gpu_hint.setWordWrap(True)
         gpu_hint.setStyleSheet(
@@ -1291,10 +1212,7 @@ class ModelSettingsPage(QWidget):
             self.status_label.setStyleSheet(
                 f"color: {COLORS['success']}; font-size: 12px; background: transparent; border: none;"
             )
-<<<<<<< HEAD
             self._update_auto_values_labels()
-=======
->>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
 
         # --- Кнопки ---
         btn_row = QHBoxLayout()
@@ -1319,7 +1237,6 @@ class ModelSettingsPage(QWidget):
 
         layout.addLayout(btn_row)
 
-<<<<<<< HEAD
     def _update_auto_values_labels(self):
         info = self.runner.model_info() if getattr(self.runner, "is_loaded", False) else {}
         ctx = info.get("n_ctx")
@@ -1367,13 +1284,6 @@ class ModelSettingsPage(QWidget):
             default_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "models")
             if not os.path.exists(default_dir):
                 default_dir = ""
-=======
-    def _browse_model(self):
-        # Путь по умолчанию к папке с моделями
-        default_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "models")
-        if not os.path.exists(default_dir):
-            default_dir = ""
->>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
         
         path, _ = QFileDialog.getOpenFileName(
             self, "Выберите GGUF-модель", default_dir, "GGUF Files (*.gguf);;All Files (*)"
@@ -1399,15 +1309,9 @@ class ModelSettingsPage(QWidget):
 
         self.worker = ModelLoadWorker(
             self.runner, path,
-<<<<<<< HEAD
             n_ctx=None,
             n_threads=None,
             n_gpu_layers=self._auto_gpu_layers,
-=======
-            n_ctx=self.ctx_spin.value(),
-            n_threads=self.threads_spin.value(),
-            n_gpu_layers=self.gpu_spin.value(),
->>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
             n_batch=768,
         )
         self.worker.progress.connect(self.progress_label.setText)
@@ -1423,14 +1327,9 @@ class ModelSettingsPage(QWidget):
             )
             self.registry.save_last_model_path(
                 self.path_edit.text().strip(),
-<<<<<<< HEAD
                 n_gpu_layers=self._auto_gpu_layers,
             )
             self._update_auto_values_labels()
-=======
-                n_gpu_layers=self.gpu_spin.value(),
-            )
->>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
             self.unload_btn.setEnabled(True)
         self.load_btn.setEnabled(True)
         self.progress_label.setText("")
@@ -1449,10 +1348,7 @@ class ModelSettingsPage(QWidget):
         self.status_label.setStyleSheet(
             f"color: {COLORS['text_muted']}; font-size: 12px; background: transparent; border: none;"
         )
-<<<<<<< HEAD
         self._update_auto_values_labels()
-=======
->>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
         self.unload_btn.setEnabled(False)
 
 
@@ -1784,8 +1680,8 @@ class ResultsPage(QWidget):
         ahint = QLabel(
             "Опишите, что сделать с уже собранным тестом. Примеры: «Замени вопрос 6», "
             "«Поставь другой вопрос вместо второго». Поддерживается несколько номеров в одной фразе.\n\n"
-            "Замены подбираются из банка вопросов (тот же тип задания), если тест изначально "
-            "строился из банка; модель только планирует и выбирает кандидата."
+            "Замены подбираются из учебника (тот же тип задания), если тест изначально "
+            "строился из учебника; модель только планирует и выбирает кандидата."
         )
         ahint.setWordWrap(True)
         ahint.setStyleSheet(
@@ -2341,7 +2237,7 @@ class TextbooksPage(QWidget):
         back_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         back_btn.clicked.connect(self.back_clicked.emit)
 
-        title = QLabel("Банки вопросов")
+        title = QLabel("Учебники")
         title.setStyleSheet(f"""
             QLabel {{
                 color: {COLORS['text_primary']};
@@ -2353,7 +2249,7 @@ class TextbooksPage(QWidget):
             }}
         """)
 
-        add_bank_btn = QPushButton("+ Банк вопросов")
+        add_bank_btn = QPushButton("+ Учебник")
         add_bank_btn.setStyleSheet(STYLE_BTN_PRIMARY)
         add_bank_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         add_bank_btn.clicked.connect(self._add_question_bank)
@@ -2368,7 +2264,7 @@ class TextbooksPage(QWidget):
 
         hint = QLabel(
             "Добавьте папку с файлами *.json (ключ «questions»). "
-            "Модель только подбирает номера заданий из банка по теме; тексты вопросов из PDF не генерируются."
+            "Модель только подбирает номера заданий из учебника по теме; тексты вопросов из PDF не генерируются."
         )
         hint.setStyleSheet(
             f"color: {COLORS['text_muted']}; font-size: 11px; background: transparent; border: none;"
@@ -2409,7 +2305,7 @@ class TextbooksPage(QWidget):
 
         books = self.registry.get_all()
         if not books:
-            empty = QLabel("Банки не добавлены. Нажмите «+ Банк вопросов».")
+            empty = QLabel("Учебники не добавлены. Нажмите «+ Учебник».")
             empty.setStyleSheet(
                 f"color: {COLORS['text_muted']}; font-size: 14px; background: transparent; border: none;"
             )
@@ -2436,7 +2332,7 @@ class TextbooksPage(QWidget):
         path_lbl.setStyleSheet(
             f"color: {COLORS['text_muted']}; font-size: 10px; background: transparent; border: none;"
         )
-        badge = QLabel("Банк")
+        badge = QLabel("Учебник")
         badge.setStyleSheet(
             f"color: {COLORS['accent']}; font-size: 10px; font-weight: 600; background: transparent; border: none;"
         )
@@ -2463,14 +2359,14 @@ class TextbooksPage(QWidget):
 
     def _add_question_bank(self):
         """Добавляет папку с JSON-файлами вопросов."""
-        root = Path(__file__).resolve().parents[1]
+        root = repo_resource_dir()
         default_dir = str(root.parent / "Materials" / "Вопросы")
         if not os.path.isdir(default_dir):
             default_dir = str(root)
 
         folder = QFileDialog.getExistingDirectory(
             self,
-            "Папка с JSON-банком вопросов",
+            "Папка с JSON-файлами учебника",
             default_dir,
             QFileDialog.Option.ShowDirsOnly,
         )
@@ -2481,8 +2377,8 @@ class TextbooksPage(QWidget):
 
         name, ok = QInputDialog.getText(
             self,
-            "Название банка",
-            "Как показывать в списке (напр. История 5 кл · банк):",
+            "Название учебника",
+            "Как показывать в списке (напр. История 5 кл · учебник):",
             text=os.path.basename(os.path.normpath(folder)),
         )
         if not ok or not name.strip():
@@ -2497,7 +2393,7 @@ class TextbooksPage(QWidget):
 
         if not ok_add:
             msg = err or (
-                "Не удалось добавить банк. Проверьте папку: нужны файлы *.json "
+                "Не удалось добавить учебник. Проверьте папку: нужны файлы *.json "
                 'с ключом \"questions\" (кроме manifest.json).'
             )
             QMessageBox.warning(self, "Ошибка", msg)
@@ -2511,7 +2407,7 @@ class TextbooksPage(QWidget):
 
         ok, message = validate_bank_folder(book["file"])
         if not ok:
-            QMessageBox.warning(self, f"Банк «{book['name']}»", message)
+            QMessageBox.warning(self, f"Учебник «{book['name']}»", message)
             self.index_progress.setText("")
             return
         try:
@@ -2522,7 +2418,7 @@ class TextbooksPage(QWidget):
             return
 
         self.index_progress.setText(
-            f"Банк «{book['name']}» подключён. Вопросов в файлах: {n}"
+            f"Учебник «{book['name']}» подключён. Вопросов в файлах: {n}"
         )
         self.textbook_selected.emit(book["name"], book["file"])
 
@@ -2603,7 +2499,7 @@ class HomePage(QWidget):
         book_lay.setContentsMargins(16, 12, 16, 12)
         book_lay.setSpacing(8)
 
-        book_title = QLabel("Банк вопросов")
+        book_title = QLabel("Учебник")
         book_title.setStyleSheet(STYLE_LABEL_TITLE)
 
         book_row = QHBoxLayout()
@@ -2613,7 +2509,7 @@ class HomePage(QWidget):
         self.book_combo.setStyleSheet(STYLE_INPUT)
         self.book_combo.setMinimumHeight(36)
         self.book_combo.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.book_combo.addItem("— Банк не выбран —")
+        self.book_combo.addItem("— Учебник не выбран —")
         self._refresh_book_combo()
         self.book_combo.currentIndexChanged.connect(self._on_book_combo_changed)
 
@@ -2636,7 +2532,7 @@ class HomePage(QWidget):
             }}
         """)
         add_book_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        add_book_btn.setToolTip("Добавить банк вопросов")
+        add_book_btn.setToolTip("Добавить учебник")
         add_book_btn.clicked.connect(self.open_textbooks.emit)
 
         book_row.addWidget(self.book_combo, 1)
@@ -3108,16 +3004,16 @@ class HomePage(QWidget):
         if not book:
             QMessageBox.warning(
                 self,
-                "Банк не выбран",
-                "Выберите банк вопросов в списке или добавьте папку в разделе «Банки вопросов».",
+                "Учебник не выбран",
+                "Выберите учебник в списке или добавьте папку в разделе «Учебники».",
             )
             return
 
         if not book.get("file") or not os.path.isdir(book["file"]):
             QMessageBox.warning(
                 self,
-                "Банк недоступен",
-                "Папка банка не найдена. Добавьте или выберите банк заново.",
+                "Учебник недоступен",
+                "Папка учебника не найдена. Добавьте или выберите учебник заново.",
             )
             return
 
@@ -3176,7 +3072,7 @@ class HomePage(QWidget):
         current = self.book_combo.currentText()
         self.book_combo.blockSignals(True)
         self.book_combo.clear()
-        self.book_combo.addItem("— Банк не выбран —")
+        self.book_combo.addItem("— Учебник не выбран —")
         for book in reg.get_all():
             self.book_combo.addItem(book["name"])
         idx = self.book_combo.findText(current)
@@ -3295,7 +3191,7 @@ class AboutPage(QWidget):
         info_text = """
 <b>Версия:</b> 1.0.0<br><br>
 <b>Описание:</b><br>
-Приложение для сборки тестов из готовых JSON-банков вопросов.<br>
+Приложение для сборки тестов из готовых JSON-учебников.<br>
 Локальная модель подбирает задания по теме; интернет не нужен.<br><br>
 <b>Технологии:</b><br>
 • Интерфейс: PySide6<br>
@@ -3303,20 +3199,12 @@ class AboutPage(QWidget):
 • Рекомендуемая модель: Qwen2.5-3B/7B-Instruct<br>
 • Экспорт: python-docx (.docx)<br><br>
 <b>Как использовать:</b><br>
-<<<<<<< HEAD
 1. Скачайте GGUF-модель отдельно от приложения<br>
 2. Положите .gguf файл в папку «Документы / ИИ-помощник учителя / Модели» или в любое удобное место<br>
-3. В разделе «Банки вопросов» добавьте папку с JSON<br>
+3. В разделе «Учебники» добавьте папку с JSON<br>
 4. В «Настройки модели» выберите .gguf файл и нажмите «Загрузить»<br>
-5. На главной странице выберите банк, введите тему и нажмите «Сгенерировать тест»<br>
+5. На главной странице выберите учебник, введите тему и нажмите «Сгенерировать тест»<br>
 6. Экспортируйте результат в Word<br><br>
-=======
-1. Скачайте GGUF-модель (например, Qwen2.5-3B-Instruct-Q4_K_M.gguf)<br>
-2. В разделе «Банки вопросов» добавьте папку с JSON<br>
-3. В «Настройки модели» укажите путь к модели и нажмите «Загрузить»<br>
-4. На главной странице выберите банк, введите тему и нажмите «Сгенерировать тест»<br>
-5. Экспортируйте результат в Word<br><br>
->>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
 <b>Ресурсы для скачивания моделей:</b><br>
 • https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF<br>
 • https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF
@@ -3346,7 +3234,7 @@ class MainWindow(QMainWindow):
 
     @staticmethod
     def _bank_folder_for_saved_textbook(registry, textbook_name: str) -> Optional[str]:
-        """Если сохранённый тест связан с записью-банком в реестре — путь к папке JSON."""
+        """Если сохранённый тест связан с записью-учебником в реестре — путь к папке JSON."""
         name = (textbook_name or "").strip()
         if not name:
             return None
@@ -3373,12 +3261,7 @@ class MainWindow(QMainWindow):
         else:
             self.setWindowIcon(app_icon())
         self.setMinimumSize(1180, 760)
-<<<<<<< HEAD
         self.resize(1280, 820)
-=======
-        # Запускаем в полноэкранном режиме
-        self.showMaximized()
->>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
 
         # Инициализируем компоненты
         self._init_components()
@@ -3400,7 +3283,7 @@ class MainWindow(QMainWindow):
         # Загружаем последнюю модель если есть
         self._try_auto_load_model()
 
-        # Загружаем последний банк из реестра, если есть
+        # Загружаем последний учебник из реестра, если есть
         self._try_auto_load_textbook()
 
     def closeEvent(self, event):
@@ -3574,7 +3457,7 @@ class MainWindow(QMainWindow):
         self._nav_buttons: dict[str, QPushButton] = {}
         nav_items = [
             ("home",       "Главная",          "home.svg"),
-            ("textbooks",  "Банки вопросов",   "book.svg"),
+            ("textbooks",  "Учебники",   "book.svg"),
             ("all_tests",  "История тестов",   "tests.svg"),
             ("model",      "Настройки модели", "model.svg"),
             ("about",      "О программе",      "about.svg"),
@@ -3702,17 +3585,12 @@ class MainWindow(QMainWindow):
     def _try_auto_load_model(self):
         """
         Пытается автоматически загрузить последнюю использованную модель.
-<<<<<<< HEAD
         GPU/CPU выбираются автоматически, если пользователь не задал ручной режим.
         HISTORY_TEST_N_GPU_LAYERS всё ещё может переопределить GPU-слои.
-=======
-        n_gpu_layers из config.json; может переопределяться HISTORY_TEST_N_GPU_LAYERS.
->>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
         """
         path = self.model_registry.get_last_model_path()
         if path and os.path.exists(path):
             try:
-<<<<<<< HEAD
                 from model_runner import AUTO_N_GPU_LAYERS
 
                 self.model_runner.load_model(
@@ -3724,21 +3602,12 @@ class MainWindow(QMainWindow):
                 )
                 if hasattr(self, "model_page"):
                     self.model_page._update_auto_values_labels()
-=======
-                self.model_runner.load_model(
-                    path,
-                    n_ctx=self.model_runner.DEFAULT_PARAMS["n_ctx"],
-                    n_threads=None,
-                    n_gpu_layers=self.model_registry.get_last_n_gpu_layers(),
-                    n_batch=256,
-                )
->>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
             except Exception as e:
                 logger.warning(f"Автозагрузка модели не удалась: {e}")
         self._update_status_bar()
 
     def _try_auto_load_textbook(self):
-        """Подключает последний банк из реестра."""
+        """Подключает последний учебник из реестра."""
         last_path = self.textbook_registry.get_last_textbook_path()
         if last_path and os.path.exists(last_path):
             last_abs = os.path.abspath(last_path)
@@ -3874,7 +3743,7 @@ class MainWindow(QMainWindow):
                     self, "Предупреждение",
                     "Не удалось сгенерировать ни одного валидного вопроса.\n"
                     "Попробуйте:\n"
-                    "• Уточнить тему или сменить банк вопросов\n"
+                    "• Уточнить тему или сменить учебник\n"
                     "• Уменьшить количество вопросов или изменить типы"
                 )
 
@@ -3940,14 +3809,14 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(
                 self,
                 "Модель не загружена",
-                "Чтобы ассистент спланировал правки и выбрал замену из банка, "
+                "Чтобы ассистент спланировал правки и выбрал замену из учебника, "
                 "сначала загрузите GGUF-модель в разделе «Настройки модели».",
             )
             return
 
         MainWindow._join_worker(getattr(self, "_assistant_worker", None))
         rp.assistant_prompt_edit.clear()
-        rp.set_assistant_busy(True, "Запрос к модели и подбор из банка…")
+        rp.set_assistant_busy(True, "Запрос к модели и подбор из учебника…")
 
         worker = TestAssistantWorker(
             self.generator,

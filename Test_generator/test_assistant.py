@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Ассистент редактирования уже собранного теста: локальная LLM планирует действия,
-подбор замены — из JSON-банка к текущей теме с исключением уже использованных позиций.
+подбор замены — из JSON-учебника к текущей теме с исключением уже использованных позиций.
 """
 from __future__ import annotations
 
@@ -152,7 +152,7 @@ def llm_pick_candidate_rank(
     usr = (
         f"Тема: «{topic.strip()}».\nЗапрос учителя: {user_message.strip()}\n\n"
         f"Старый вопрос (вырезаем из теста):\n{old_sh}\n\n"
-        "Кандидаты из учебного банка:\n"
+        "Кандидаты из учебника:\n"
         f"{blob}\n\n"
         'Ответь только одним JSON-объектом: {"pick": <целое от 1 до M>}.'
     )
@@ -219,7 +219,7 @@ def replace_one_from_bank(
     build_question_fn: Callable[..., Any],
 ) -> tuple[bool, str]:
     """
-    Заменяет вопрос с индексом replace_index_1based новым из банка того же типа.
+    Заменяет вопрос с индексом replace_index_1based новым из учебника того же типа.
     Изменяет список questions на месте.
     """
     idx = replace_index_1based
@@ -239,7 +239,7 @@ def replace_one_from_bank(
     try:
         index = QuestionBankIndex(bank_folder)
     except Exception as e:
-        return (False, f"Не удалось открыть банк: {e}")
+        return (False, f"Не удалось открыть учебник: {e}")
 
     scored = filter_scored_typed_items(
         index,
@@ -250,7 +250,7 @@ def replace_one_from_bank(
         ui_question_type=ui_type,
     )
     if not scored:
-        return (False, f"Нет записей типа «{ui_type}» в банке по этой теме.")
+        return (False, f"Нет записей типа «{ui_type}» в учебнике по этой теме.")
 
     picks: list[tuple[float, Any]] = []
     for sc, bi in scored:
@@ -267,7 +267,7 @@ def replace_one_from_bank(
         picks.append((sc, nq))
 
     if not picks:
-        return (False, "Не найден другой подходящий вопрос в банке (все уже в тесте или не проходят фильтр).")
+        return (False, "Не найден другой подходящий вопрос в учебнике (все уже в тесте или не проходят фильтр).")
 
     rng = random.Random(hash((topic, idx, old_txt[:120], len(picks))) & 0xFFFFFFFF)
     rng.shuffle(picks)
@@ -311,7 +311,7 @@ def run_test_assistant_turn(
     user_message: str,
 ) -> tuple[str, list[Any]]:
     """
-    Одна «итерация» ассистента: план действий через LLM, затем применение замен из банка.
+    Одна «итерация» ассистента: план действий через LLM, затем применение замен из учебника.
     Возвращает (сообщение для пользователя, тот же список questions с правками).
     """
     user_message = user_message.strip()
@@ -341,8 +341,8 @@ def run_test_assistant_turn(
 
     if not bank_folder or not str(bank_folder).strip():
         tail_notes.append(
-            "Подбор замены из банка возможен только если тест связан с папкой банка вопросов. "
-            "Сгенерируйте тест, выбрав банк в разделе «Учебники», или откройте такой тест из истории."
+            "Подбор замены из учебника возможен только если тест связан с папкой учебника. "
+            "Сгенерируйте тест, выбрав учебник в разделе «Учебники», или откройте такой тест из истории."
         )
         return (reply + ("\n\n" + "\n".join(tail_notes) if tail_notes else ""), questions)
 

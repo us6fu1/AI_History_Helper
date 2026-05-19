@@ -117,11 +117,7 @@ def main():
             pass
 
     app = QApplication(sys.argv)
-<<<<<<< HEAD
     app.setApplicationName("ИИ-помощник учителя")
-=======
-    app.setApplicationName("Генератор тестов по истории")
->>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
     app.setApplicationVersion("1.0.0")
     app.setOrganizationName("HistoryTestGen")
 

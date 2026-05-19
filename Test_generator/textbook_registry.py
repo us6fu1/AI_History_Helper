@@ -1,5 +1,5 @@
 """
-Реестр банков вопросов (папки с JSON). Файл data/textbooks.json сохранён для совместимости.
+Реестр учебников (папки с JSON). Файл data/textbooks.json сохранён для совместимости.
 """
 from __future__ import annotations
 
@@ -8,30 +8,24 @@ import os
 import re
 from typing import Optional
 
+from app_paths import app_resource_dir, repo_resource_dir, user_data_dir
+
 
 class TextbookRegistry:
-<<<<<<< HEAD
-    APP_DIR = os.path.dirname(os.path.abspath(__file__))
-    REPO_ROOT = os.path.dirname(APP_DIR)
+    APP_DIR = str(app_resource_dir())
+    REPO_ROOT = str(repo_resource_dir())
     BUNDLED_BANKS_DIR = os.path.join(REPO_ROOT, "Materials", "Textbooks")
     REGISTRY_FILE = os.path.join(
-        APP_DIR,
-=======
-    REGISTRY_FILE = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
->>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
-        "data",
+        str(user_data_dir()),
         "textbooks.json",
     )
+    TEMPLATE_REGISTRY_FILE = os.path.join(APP_DIR, "data", "textbooks.json")
 
     def __init__(self):
         os.makedirs(os.path.dirname(self.REGISTRY_FILE), exist_ok=True)
         self._data: list[dict] = self._load()
         self._migrate_kinds()
-<<<<<<< HEAD
         self._repair_or_discover_banks()
-=======
->>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
 
     def _migrate_kinds(self) -> None:
         dirty = False
@@ -45,9 +39,12 @@ class TextbookRegistry:
             self._save()
 
     def _load(self) -> list[dict]:
-        if os.path.exists(self.REGISTRY_FILE):
+        source = self.REGISTRY_FILE
+        if not os.path.exists(source) and os.path.exists(self.TEMPLATE_REGISTRY_FILE):
+            source = self.TEMPLATE_REGISTRY_FILE
+        if os.path.exists(source):
             try:
-                with open(self.REGISTRY_FILE, "r", encoding="utf-8") as f:
+                with open(source, "r", encoding="utf-8-sig") as f:
                     return json.load(f)
             except Exception:
                 return []
@@ -57,7 +54,6 @@ class TextbookRegistry:
         with open(self.REGISTRY_FILE, "w", encoding="utf-8") as f:
             json.dump(self._data, f, ensure_ascii=False, indent=2)
 
-<<<<<<< HEAD
     @classmethod
     def _resolve_path(cls, folder: str) -> str:
         if not folder:
@@ -148,8 +144,6 @@ class TextbookRegistry:
             self._data = repaired
             self._save()
 
-=======
->>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
     def add_bank(self, name: str, folder: str) -> bool:
         from question_bank import validate_bank_folder
 
@@ -171,15 +165,11 @@ class TextbookRegistry:
         self._save()
 
     def get_all(self) -> list[dict]:
-<<<<<<< HEAD
         self._repair_or_discover_banks()
         valid = [
             x for x in self._data
             if self._is_valid_bank_folder(self._resolve_path(str(x.get("file") or "")))
         ]
-=======
-        valid = [x for x in self._data if os.path.exists(x["file"])]
->>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
         if len(valid) != len(self._data):
             self._data = valid
             self._save()
@@ -195,7 +185,6 @@ class TextbookRegistry:
         return (999, name)
 
     def get_by_name(self, name: str) -> Optional[dict]:
-<<<<<<< HEAD
         self._repair_or_discover_banks()
         for item in self._data:
             if item["name"] == name and item.get("kind") == "bank":
@@ -204,13 +193,6 @@ class TextbookRegistry:
                     out = dict(item)
                     out["file"] = os.path.abspath(fp)
                     return out
-=======
-        for item in self._data:
-            if item["name"] == name and item.get("kind") == "bank":
-                fp = item.get("file", "")
-                if fp and os.path.exists(fp) and os.path.isdir(fp):
-                    return item
->>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
         return None
 
     def save_last_textbook_path(self, path: str) -> None:

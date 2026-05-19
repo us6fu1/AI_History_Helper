@@ -2,7 +2,7 @@
 Генерация и проверка вопросов: промпт к LLM → JSON → валидация.
 
 Кэш (опционально): HISTORY_TEST_GEN_CACHE=1 → data/gen_cache/ (или HISTORY_TEST_GEN_CACHE_DIR).
-Сброс при смене банка (JSON) или GGUF.
+Сброс при смене учебника (JSON) или GGUF.
 """
 from __future__ import annotations
 
@@ -14,6 +14,8 @@ import hashlib
 import logging
 from typing import Optional, Callable
 from dataclasses import dataclass, field, asdict
+
+from app_paths import user_data_dir
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +55,7 @@ def _gen_cache_dir() -> str:
     custom = os.environ.get("HISTORY_TEST_GEN_CACHE_DIR", "").strip()
     if custom:
         return custom
-    base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "gen_cache")
+    base = os.path.join(str(user_data_dir()), "gen_cache")
     os.makedirs(base, exist_ok=True)
     return base
 
@@ -92,7 +94,7 @@ class Question:
 
 
 class QuestionGenerator:
-    """Подбор вопросов из JSON-банка через локальную GGUF-модель."""
+    """Подбор вопросов из JSON-учебника через локальную GGUF-модель."""
 
     def __init__(self, model_runner):
         self.model = model_runner
@@ -115,11 +117,7 @@ class QuestionGenerator:
     ) -> dict:
         mp, mm, ms = _file_fingerprint(getattr(self.model, "model_path", "") or "")
         return {
-<<<<<<< HEAD
             "schema": 4,
-=======
-            "schema": 3,
->>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
             "topic": topic.strip().lower(),
             "question_type": question_type,
             "count": int(count),
@@ -196,10 +194,10 @@ class QuestionGenerator:
         from question_bank import bank_folder_fingerprint
 
         if not bank_folder:
-            raise RuntimeError("Не выбран банк вопросов (папка с JSON).")
+            raise RuntimeError("Не выбран учебник (папка с JSON).")
         bf = os.path.abspath(bank_folder)
         if not os.path.isdir(bf):
-            raise ValueError(f"Папка банка не найдена: {bf}")
+            raise ValueError(f"Папка учебника не найдена: {bf}")
         bank_fp = bank_folder_fingerprint(bf)
 
         cache_key = None
@@ -267,7 +265,7 @@ class QuestionGenerator:
         topic: str,
         difficulty: str,
     ) -> Optional[Question]:
-        """Собирает Question только из полей JSON банка (без LLM)."""
+        """Собирает Question только из полей JSON учебника (без LLM)."""
         import random
 
         from question_bank import (
@@ -435,7 +433,7 @@ class QuestionGenerator:
         if not scored:
             if progress_callback:
                 progress_callback(
-                    f"В банке не найдено вопросов типа «{type_ru.get(question_type, question_type)}» "
+                    f"В учебнике не найдено вопросов типа «{type_ru.get(question_type, question_type)}» "
                     "по теме — этот блок в тест не включается."
                 )
             return []
@@ -490,11 +488,11 @@ class QuestionGenerator:
                     temperature=0.12,
                 )
             except Exception as e_chat:
-                logger.warning("Подбор из банка: chat без формата не удался (%s)", e_chat)
+                logger.warning("Подбор из учебника: chat без формата не удался (%s)", e_chat)
                 raw = ""
         except Exception as e_chat:
             # Переполнение контекста или сбой бэкенда — берём номера по релевантности без LLM
-            logger.warning("Подбор из банка: chat-LLM недоступен (%s)", e_chat)
+            logger.warning("Подбор из учебника: chat-LLM недоступен (%s)", e_chat)
             if progress_callback:
                 progress_callback("Генерация теста")
             raw = ""
@@ -566,7 +564,7 @@ class QuestionGenerator:
         if not final:
             if progress_callback:
                 progress_callback(
-                    "Не удалось собрать вопросы из банка для этого типа — блок пропускается."
+                    "Не удалось собрать вопросы из учебника для этого типа — блок пропускается."
                 )
             return []
 
@@ -632,8 +630,7 @@ class TestStorage:
     """Сохраняет и загружает сгенерированные тесты."""
 
     STORAGE_FILE = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "data", "tests_history.json"
+        str(user_data_dir()), "tests_history.json"
     )
 
     def __init__(self):

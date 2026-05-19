@@ -9,10 +9,7 @@ __pycache__/
 .eggs/
 dist/
 build/
-<<<<<<< HEAD
 dist_new_icon/
-=======
->>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
 
 # Локальные модели (GGUF) — скачиваются отдельно
 *.gguf
@@ -27,7 +24,6 @@ Test_generator/data/rag_indexes/
 # Локальные ярлыки и кэш приложения (на каждом ПК создаются заново)
 Test_generator/data/config.json
 Test_generator/data/gen_cache/
-<<<<<<< HEAD
 Test_generator/data/tests_history.json
 
 # PyInstaller / временные файлы сборки
@@ -37,8 +33,6 @@ Test_generator/build/
 # Временные файлы, созданные при подготовке иконки
 Test_generator/assets/app_icons/
 Test_generator/assets/*_before_custom_icon.*
-=======
->>>>>>> 06236faa0a59c3fe63a9caebf58e61189dc30581
 
 # IDE / OS
 .idea/
