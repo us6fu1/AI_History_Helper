@@ -1,0 +1,42 @@
+# Python
+.venv/
+venv/
+**/.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+dist_new_icon/
+
+# Локальные модели (GGUF) — скачиваются отдельно
+*.gguf
+models/
+
+# PDF в Materials (любой регистр пути к «учебникам») — не для GitHub
+Materials/**/*.pdf
+
+# Кэш RAG (пересобирается из PDF)
+Test_generator/data/rag_indexes/
+
+# Локальные ярлыки и кэш приложения (на каждом ПК создаются заново)
+Test_generator/data/config.json
+Test_generator/data/gen_cache/
+Test_generator/data/tests_history.json
+
+# PyInstaller / временные файлы сборки
+Test_generator/dist*/
+Test_generator/build/
+
+# Временные файлы, созданные при подготовке иконки
+Test_generator/assets/app_icons/
+Test_generator/assets/*_before_custom_icon.*
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
