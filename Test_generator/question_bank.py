@@ -26,14 +26,14 @@ _STOP = frozenset(
 )
 _TOPIC_GROUPS: dict[str, tuple[str, ...]] = {
     "rome": (
-        "рим", "римск", "римлян", "итал", "латин", "этруск", "патриц", "плеб",
+        "рим", "римск", "римлян", "итал", "латин", "этруск", "патриц", "плеб", "спартак",
         "сенат", "консул", "трибун", "республик", "цезар", "август",
         "октавиан", "гладиатор", "колиз", "форум", "легион", "пуничес",
         "карфаген", "ганнибал", "пирр", "самнит", "понтифик", "вандал",
         "вестгот", "аттил", "принципат", "доминат",
     ),
     "greece": (
-        "греци", "грец", "грек", "греческ", "эллад", "эллин", "афин", "спарт",
+        "греци", "грец", "грек", "греческ", "эллад", "эллин", "афин", "спарта", "спартан",
         "полис", "олимпи", "гомер", "ахилл", "перикл", "солон", "македон",
         "александр", "марафон", "саламин", "пелопоннес",
     ),
@@ -62,6 +62,7 @@ _GROUP_EXCLUSIVE = tuple(_TOPIC_GROUPS)
 _TOPIC_ALIASES: dict[str, tuple[str, ...]] = {
     "рим": _TOPIC_GROUPS["rome"],
     "римск": _TOPIC_GROUPS["rome"],
+    "спартак": ("спартак",),
     "греци": _TOPIC_GROUPS["greece"],
     "грец": _TOPIC_GROUPS["greece"],
     "егип": _TOPIC_GROUPS["egypt"],
@@ -95,7 +96,14 @@ def _token_set(text: str) -> set[str]:
 
 
 def _contains_any(text_l: str, needles: tuple[str, ...]) -> bool:
-    return any(k in text_l for k in needles)
+    for k in needles:
+        if k == "спарта":
+            if re.search(r"\bспарт(?:а|е|у|ой|ы)\b", text_l):
+                return True
+            continue
+        if k in text_l:
+            return True
+    return False
 
 
 def _topic_groups(text_l: str) -> set[str]:
@@ -113,6 +121,10 @@ def _topic_search_terms(topic: str, extra: str) -> set[str]:
         if key in lower:
             terms.update(aliases)
     return {t for t in terms if t not in _STOP}
+
+
+def _literal_topic_terms(topic: str) -> set[str]:
+    return {t for t in _token_set(topic) if len(t) >= 5 and t not in _STOP}
 
 
 def _matches_topic_guard(topic_l: str, extra_l: str, blob_l: str) -> bool:
@@ -265,7 +277,7 @@ class BankItem:
                             self.raw.get("question") or self.raw.get("text") or ""]
         tags = self.raw.get("tags")
         if isinstance(tags, dict):
-            for key in ("themes", "concepts", "entities"):
+            for key in ("themes", "concepts"):
                 v = tags.get(key)
                 if isinstance(v, list):
                     parts.append(" ".join(str(x) for x in v))
@@ -324,14 +336,14 @@ class QuestionBankIndex:
         if not key_toks:
             return 1.0 + score
         hit = len(key_toks & _token_set(blob_l))
-        score += float(hit)
+        score += float(hit) * 4.0
         for t in key_toks:
             if len(t) >= 5 and t in blob_l:
-                score += 0.35
+                score += 4.0
         intents = _topic_groups(combined)
         for g in intents:
             if _contains_any(blob_l, _TOPIC_GROUPS[g]):
-                score += 8.0
+                score += 4.0
         score *= _geo_match_multiplier(topic_l, blob_l)
         return max(score, 0.01)
 
@@ -360,6 +372,15 @@ def filter_scored_items(
         sc = QuestionBankIndex.score_item(bi, topic, extra)
         scored.append((sc, bi))
     scored.sort(key=lambda t: -t[0])
+    literal_terms = _literal_topic_terms(topic)
+    if literal_terms:
+        literal_scored = [
+            (sc, bi)
+            for sc, bi in scored
+            if any(t in bi.search_blob().lower() for t in literal_terms)
+        ]
+        if literal_scored:
+            scored = literal_scored
     return scored[: max(pool_size, 1)]
 
 

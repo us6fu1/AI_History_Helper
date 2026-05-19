@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 import logging
-import random
 import re
 from typing import Any, Callable, Optional
 
@@ -269,10 +268,14 @@ def replace_one_from_bank(
     if not picks:
         return (False, "Не найден другой подходящий вопрос в учебнике (все уже в тесте или не проходят фильтр).")
 
-    rng = random.Random(hash((topic, idx, old_txt[:120], len(picks))) & 0xFFFFFFFF)
-    rng.shuffle(picks)
+    def _stable_pick_key(item: tuple[float, Any]) -> tuple[float, str, str]:
+        sc, nq = item
+        nd = nq.to_dict() if hasattr(nq, "to_dict") else {}
+        text_key = norm_text_fn(str(nd.get("text") or ""))
+        uid_key = str(nd.get("bank_uid") or "")
+        return (-sc, text_key, uid_key)
 
-    picks.sort(key=lambda t: (-t[0], random.random()))
+    picks.sort(key=_stable_pick_key)
 
     max_show = min(16, len(picks))
     top = picks[:max_show]
