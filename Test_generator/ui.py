@@ -788,6 +788,34 @@ class TestAssistantWorker(QThread):
             self.assistant_error.emit(str(e))
 
 
+class PdfBankBuildWorker(QThread):
+    """Создаёт папку JSON-банка из PDF в фоновом потоке."""
+
+    progress = Signal(str)
+    pdf_bank_finished = Signal(str, str)
+    pdf_bank_error = Signal(str)
+
+    def __init__(self, model_runner, pdf_path: str, textbook_name: str):
+        super().__init__()
+        self.model_runner = model_runner
+        self.pdf_path = pdf_path
+        self.textbook_name = textbook_name
+
+    def run(self):
+        try:
+            from pdf_bank_builder import build_question_bank_from_pdf
+
+            folder = build_question_bank_from_pdf(
+                pdf_path=self.pdf_path,
+                textbook_name=self.textbook_name,
+                model_runner=self.model_runner,
+                progress_callback=lambda msg: self.progress.emit(msg),
+            )
+            self.pdf_bank_finished.emit(self.textbook_name, folder)
+        except Exception as e:
+            self.pdf_bank_error.emit(str(e))
+
+
 def make_card(parent=None, *, with_shadow: bool = True) -> QFrame:
     """Создаёт карточку с лёгкой тенью."""
     frame = QFrame(parent)
@@ -2218,9 +2246,11 @@ class TextbooksPage(QWidget):
     textbook_selected = Signal(str, str)
     back_clicked = Signal()
 
-    def __init__(self, registry, parent=None):
+    def __init__(self, registry, model_runner=None, parent=None):
         super().__init__(parent)
         self.registry = registry
+        self.model_runner = model_runner
+        self._pdf_worker: Optional[PdfBankBuildWorker] = None
         self._build_ui()
 
     def _build_ui(self):
@@ -2249,22 +2279,23 @@ class TextbooksPage(QWidget):
             }}
         """)
 
-        add_bank_btn = QPushButton("+ Учебник")
-        add_bank_btn.setStyleSheet(STYLE_BTN_PRIMARY)
-        add_bank_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        add_bank_btn.clicked.connect(self._add_question_bank)
+        self.add_pdf_btn = QPushButton("Создать банк вопросов")
+        self.add_pdf_btn.setStyleSheet(STYLE_BTN_PRIMARY)
+        self.add_pdf_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.add_pdf_btn.setToolTip("Загрузить учебник PDF и создать папку с вопросами")
+        self.add_pdf_btn.clicked.connect(self._add_pdf_bank)
 
         header.addWidget(back_btn)
         header.addWidget(title)
         header.addStretch()
-        header.addWidget(add_bank_btn)
+        header.addWidget(self.add_pdf_btn)
         layout.addLayout(header)
 
         layout.addWidget(make_separator())
 
         hint = QLabel(
-            "Добавьте папку с файлами *.json (ключ «questions»). "
-            "Модель только подбирает номера заданий из учебника по теме; тексты вопросов из PDF не генерируются."
+            "Все учебники Мединского уже загружены. При необходимости можно загрузить свой PDF: "
+            "приложение создаст папку с JSON-вопросами и подключит её как новый учебник."
         )
         hint.setStyleSheet(
             f"color: {COLORS['text_muted']}; font-size: 11px; background: transparent; border: none;"
@@ -2305,7 +2336,7 @@ class TextbooksPage(QWidget):
 
         books = self.registry.get_all()
         if not books:
-            empty = QLabel("Учебники не добавлены. Нажмите «+ Учебник».")
+            empty = QLabel("Учебники не добавлены. Нажмите «Создать банк вопросов».")
             empty.setStyleSheet(
                 f"color: {COLORS['text_muted']}; font-size: 14px; background: transparent; border: none;"
             )
@@ -2332,9 +2363,11 @@ class TextbooksPage(QWidget):
         path_lbl.setStyleSheet(
             f"color: {COLORS['text_muted']}; font-size: 10px; background: transparent; border: none;"
         )
-        badge = QLabel("Учебник")
+        is_pdf = book.get("kind") == "pdf"
+        badge = QLabel("PDF-учебник" if is_pdf else "Учебник")
         badge.setStyleSheet(
-            f"color: {COLORS['accent']}; font-size: 10px; font-weight: 600; background: transparent; border: none;"
+            f"color: {COLORS['text_muted'] if is_pdf else COLORS['accent']}; "
+            "font-size: 10px; font-weight: 600; background: transparent; border: none;"
         )
         info_lay.addWidget(name_lbl)
         info_lay.addWidget(badge)
@@ -2402,7 +2435,98 @@ class TextbooksPage(QWidget):
         self.refresh()
         self._use_bank({"name": name.strip(), "file": os.path.abspath(folder), "kind": "bank"})
 
+    def _add_pdf_bank(self):
+        """Создаёт банк вопросов из PDF с помощью загруженной модели."""
+        if self._pdf_worker is not None and self._pdf_worker.isRunning():
+            return
+        if self.model_runner is None or not getattr(self.model_runner, "is_loaded", False):
+            QMessageBox.warning(
+                self,
+                "Модель не загружена",
+                "Чтобы превратить PDF в папку JSON-вопросов, сначала загрузите модель "
+                "в разделе «Настройки модели».",
+            )
+            return
+
+        pdf_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Выберите PDF-файл учебника",
+            str(repo_resource_dir()),
+            "PDF-файлы (*.pdf)",
+        )
+        if not pdf_path:
+            return
+
+        from PySide6.QtWidgets import QInputDialog
+
+        default_name = os.path.splitext(os.path.basename(pdf_path))[0].strip() or "PDF учебник"
+        name, ok = QInputDialog.getText(
+            self,
+            "Название учебника",
+            "Как показывать в списке учебников:",
+            text=default_name,
+        )
+        if not ok or not name.strip():
+            return
+
+        self._set_pdf_busy(True, "Подготовка PDF…")
+        worker = PdfBankBuildWorker(self.model_runner, pdf_path, name.strip())
+        self._pdf_worker = worker
+        worker.progress.connect(lambda msg: self.index_progress.setText(msg))
+        worker.pdf_bank_finished.connect(self._on_pdf_bank_finished)
+        worker.pdf_bank_error.connect(self._on_pdf_bank_error)
+        worker.finished.connect(worker.deleteLater)
+        worker.start()
+
+    def _set_pdf_busy(self, busy: bool, status: str = ""):
+        self.add_pdf_btn.setEnabled(not busy)
+        self.index_progress.setText(status)
+
+    def _on_pdf_bank_finished(self, name: str, folder: str):
+        self._pdf_worker = None
+        self._set_pdf_busy(False)
+        ok_add = False
+        err = ""
+        try:
+            ok_add = self.registry.add_bank(name, folder)
+        except Exception as e:
+            err = str(e)
+
+        if not ok_add:
+            QMessageBox.warning(
+                self,
+                "PDF обработан, но не подключён",
+                err or "Папка создана, но её не удалось добавить в список учебников.",
+            )
+            self.refresh()
+            return
+
+        self.refresh()
+        self._use_bank({"name": name, "file": os.path.abspath(folder), "kind": "bank"})
+        QMessageBox.information(
+            self,
+            "PDF готов",
+            f"Создана папка с JSON-вопросами:\n{folder}",
+        )
+
+    def _on_pdf_bank_error(self, error: str):
+        self._pdf_worker = None
+        self._set_pdf_busy(False)
+        QMessageBox.critical(self, "Ошибка обработки PDF", error)
+
     def _use_bank(self, book: dict):
+        if book.get("kind") == "pdf":
+            path = str(book.get("file") or "")
+            if not os.path.isfile(path):
+                QMessageBox.warning(self, f"Учебник «{book['name']}»", "PDF-файл не найден.")
+                return
+            self.index_progress.setText(
+                f"PDF-учебник «{book['name']}» выбран для отображения. "
+                "Для генерации нужен JSON-банк вопросов."
+            )
+            self.textbook_selected.emit(book["name"], path)
+            return
+
         from question_bank import QuestionBankIndex, validate_bank_folder
 
         ok, message = validate_bank_folder(book["file"])
@@ -2417,9 +2541,7 @@ class TextbooksPage(QWidget):
             self.index_progress.setText("")
             return
 
-        self.index_progress.setText(
-            f"Учебник «{book['name']}» подключён. Вопросов в файлах: {n}"
-        )
+        self.index_progress.setText(f"Учебник «{book['name']}» подключён.")
         self.textbook_selected.emit(book["name"], book["file"])
 
     def _delete_book(self, book: dict):
@@ -3009,6 +3131,15 @@ class HomePage(QWidget):
             )
             return
 
+        if book.get("kind") == "pdf":
+            QMessageBox.warning(
+                self,
+                "Выбран PDF-учебник",
+                "Этот учебник добавлен в меню для отображения. Для генерации тестов "
+                "нужно сначала создать по нему банк вопросов в разделе «Учебники».",
+            )
+            return
+
         if not book.get("file") or not os.path.isdir(book["file"]):
             QMessageBox.warning(
                 self,
@@ -3292,6 +3423,7 @@ class MainWindow(QMainWindow):
             st.stop()
         MainWindow._join_worker(getattr(self, "_generation_worker", None))
         MainWindow._join_worker(getattr(self, "_assistant_worker", None))
+        MainWindow._join_worker(getattr(self.textbooks_page, "_pdf_worker", None))
         MainWindow._join_worker(getattr(self.model_page, "worker", None))
         super().closeEvent(event)
 
@@ -3349,7 +3481,8 @@ class MainWindow(QMainWindow):
         self.home_page.show_more_btn.clicked.connect(lambda: self._show_page("all_tests"))
 
         self.textbooks_page = TextbooksPage(
-            self.textbook_registry
+            self.textbook_registry,
+            self.model_runner,
         )
         self.textbooks_page.textbook_selected.connect(self._on_textbook_selected)
         self.textbooks_page.back_clicked.connect(lambda: self._show_page("home"))

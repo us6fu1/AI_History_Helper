@@ -1,5 +1,6 @@
 """
-Реестр учебников (папки с JSON). Файл data/textbooks.json сохранён для совместимости.
+Реестр учебников: рабочие JSON-банки и PDF-учебники для отображения.
+Файл data/textbooks.json сохранён для совместимости.
 """
 from __future__ import annotations
 
@@ -14,7 +15,7 @@ from app_paths import app_resource_dir, repo_resource_dir, user_data_dir
 class TextbookRegistry:
     APP_DIR = str(app_resource_dir())
     REPO_ROOT = str(repo_resource_dir())
-    BUNDLED_BANKS_DIR = os.path.join(REPO_ROOT, "Materials", "Textbooks")
+    BUNDLED_BANKS_DIR = os.path.join(REPO_ROOT, "Materials", "Вопросы")
     REGISTRY_FILE = os.path.join(
         str(user_data_dir()),
         "textbooks.json",
@@ -25,7 +26,7 @@ class TextbookRegistry:
         os.makedirs(os.path.dirname(self.REGISTRY_FILE), exist_ok=True)
         self._data: list[dict] = self._load()
         self._migrate_kinds()
-        self._repair_or_discover_banks()
+        self._repair_or_discover_resources()
 
     def _migrate_kinds(self) -> None:
         dirty = False
@@ -87,6 +88,20 @@ class TextbookRegistry:
             banks.append({"name": name, "file": os.path.abspath(folder), "kind": "bank"})
         return banks
 
+    def _discover_bundled_pdfs(self) -> list[dict]:
+        root = self.BUNDLED_BANKS_DIR
+        if not os.path.isdir(root):
+            return []
+
+        pdfs: list[dict] = []
+        for name in sorted(os.listdir(root)):
+            path = os.path.join(root, name)
+            if not os.path.isfile(path) or not name.lower().endswith(".pdf"):
+                continue
+            display = os.path.splitext(name)[0].strip()
+            pdfs.append({"name": display, "file": os.path.abspath(path), "kind": "pdf"})
+        return pdfs
+
     def _find_relocated_bank(self, item: dict) -> str:
         old_path = str(item.get("file") or "")
         old_base = os.path.basename(os.path.normpath(old_path)) if old_path else ""
@@ -101,16 +116,22 @@ class TextbookRegistry:
                 return folder
         return ""
 
-    def _repair_or_discover_banks(self) -> None:
+    def _repair_or_discover_resources(self) -> None:
         dirty = False
         repaired: list[dict] = []
         seen_paths: set[str] = set()
 
         for item in self._data:
-            if item.get("kind") != "bank":
+            if item.get("kind") not in ("bank", "pdf"):
                 continue
             fp = self._resolve_path(str(item.get("file") or ""))
-            if not self._is_valid_bank_folder(fp):
+            kind = item.get("kind")
+            is_valid = (
+                self._is_valid_bank_folder(fp)
+                if kind == "bank"
+                else os.path.isfile(fp) and fp.lower().endswith(".pdf")
+            )
+            if not is_valid and kind == "bank":
                 relocated = self._find_relocated_bank(item)
                 if not relocated:
                     dirty = True
@@ -121,6 +142,9 @@ class TextbookRegistry:
                 if not item.get("name"):
                     item["name"] = os.path.basename(os.path.normpath(relocated))
                 dirty = True
+            elif not is_valid:
+                dirty = True
+                continue
 
             ap = os.path.abspath(str(item["file"]))
             key = os.path.normcase(ap)
@@ -132,12 +156,12 @@ class TextbookRegistry:
             item["file"] = ap
             repaired.append(item)
 
-        for bank in self._discover_bundled_banks():
-            key = os.path.normcase(os.path.abspath(bank["file"]))
+        for discovered in self._discover_bundled_banks() + self._discover_bundled_pdfs():
+            key = os.path.normcase(os.path.abspath(discovered["file"]))
             if key in seen_paths:
                 continue
             seen_paths.add(key)
-            repaired.append(bank)
+            repaired.append(discovered)
             dirty = True
 
         if dirty or repaired != self._data:
@@ -165,31 +189,39 @@ class TextbookRegistry:
         self._save()
 
     def get_all(self) -> list[dict]:
-        self._repair_or_discover_banks()
+        self._repair_or_discover_resources()
         valid = [
             x for x in self._data
-            if self._is_valid_bank_folder(self._resolve_path(str(x.get("file") or "")))
+            if self._is_valid_resource(x)
         ]
         if len(valid) != len(self._data):
             self._data = valid
             self._save()
-        banks = [x for x in valid if x.get("kind") == "bank"]
-        return sorted(banks, key=self._extract_class_number)
+        return sorted(valid, key=self._extract_class_number)
+
+    def _is_valid_resource(self, item: dict) -> bool:
+        fp = self._resolve_path(str(item.get("file") or ""))
+        if item.get("kind") == "bank":
+            return self._is_valid_bank_folder(fp)
+        if item.get("kind") == "pdf":
+            return os.path.isfile(fp) and fp.lower().endswith(".pdf")
+        return False
 
     @staticmethod
     def _extract_class_number(book: dict) -> tuple:
         name = book.get("name", "")
         match = re.match(r"^(\d+)\s*класс", name)
         if match:
-            return (int(match.group(1)), name)
-        return (999, name)
+            kind_order = 0 if book.get("kind") == "bank" else 1
+            return (int(match.group(1)), kind_order, name)
+        return (999, 9, name)
 
     def get_by_name(self, name: str) -> Optional[dict]:
-        self._repair_or_discover_banks()
+        self._repair_or_discover_resources()
         for item in self._data:
-            if item["name"] == name and item.get("kind") == "bank":
+            if item["name"] == name and item.get("kind") in ("bank", "pdf"):
                 fp = self._resolve_path(str(item.get("file") or ""))
-                if self._is_valid_bank_folder(fp):
+                if self._is_valid_resource(item):
                     out = dict(item)
                     out["file"] = os.path.abspath(fp)
                     return out

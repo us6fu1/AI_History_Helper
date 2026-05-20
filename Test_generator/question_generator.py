@@ -98,6 +98,7 @@ class QuestionGenerator:
 
     def __init__(self, model_runner):
         self.model = model_runner
+        self._recent_bank_uids: dict[str, set[str]] = {}
 
     @staticmethod
     def _gen_cache_digest(payload: dict) -> str:
@@ -117,7 +118,7 @@ class QuestionGenerator:
     ) -> dict:
         mp, mm, ms = _file_fingerprint(getattr(self.model, "model_path", "") or "")
         return {
-            "schema": 4,
+            "schema": 5,
             "topic": topic.strip().lower(),
             "question_type": question_type,
             "count": int(count),
@@ -438,15 +439,33 @@ class QuestionGenerator:
                 )
             return []
         pick_n = min(target_count, len(scored))
-        max_led = min(len(scored), max(12, pick_n * 4), 22)
+        max_led = min(len(scored), max(24, pick_n * 6), 56)
         lines, items = build_compact_pick_ledger(
             scored,
             max_items=max_led,
-            question_cap=68,
-            section_cap=22,
+            question_cap=82,
+            section_cap=30,
         )
         n_items = len(items)
         pick_n = min(target_count, n_items)
+        score_by_index = {i: scored[i][0] for i in range(n_items)}
+        best_score = max(score_by_index.values(), default=0.0)
+        min_llm_score = max(4.0, best_score * 0.35) if best_score > 0 else 0.0
+
+        select_key_payload = {
+            "folder": os.path.abspath(folder),
+            "topic": topic.strip().lower(),
+            "type": question_type,
+            "difficulty": difficulty,
+            "custom_prompt": custom_prompt.strip().lower(),
+        }
+        select_key = hashlib.sha256(
+            json.dumps(select_key_payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
+        ).hexdigest()
+        candidate_uids = [items[i].uid() for i in range(n_items)]
+        recent = self._recent_bank_uids.setdefault(select_key, set())
+        if sum(1 for uid in candidate_uids if uid not in recent) < pick_n:
+            recent.clear()
 
         topic_s = topic.strip()
         if len(topic_s) > 220:
@@ -462,7 +481,8 @@ class QuestionGenerator:
         ledger_text = "\n".join(lines)
         user_prompt = (
             f"Тема: «{topic_s}». Тип: {type_ru.get(question_type, question_type)}.\n"
-            f"Выбери ровно {pick_n} разных номеров из списка (1…{n_items}), релевантных теме."
+            f"Выбери ровно {pick_n} разных номеров из списка (1…{n_items}), релевантных теме. "
+            "Список уже отсортирован по релевантности: предпочитай верхние номера и не бери вопросы, которые лишь косвенно похожи на тему."
             f"{extra}\n"
             'Ответ только JSON: {"pick":[числа]}\n\n'
             f"{ledger_text}"
@@ -517,6 +537,8 @@ class QuestionGenerator:
         seen: set[int] = set()
         ordered_pick: list[int] = []
         for i in picked_idx:
+            if score_by_index.get(i, 0.0) < min_llm_score:
+                continue
             if i not in seen:
                 seen.add(i)
                 ordered_pick.append(i)
@@ -538,8 +560,11 @@ class QuestionGenerator:
         seen_txt: set[str] = set()
         final: list[Question] = []
 
-        def _take(ji: int) -> None:
+        def _take(ji: int, *, allow_recent: bool = False) -> None:
             if len(final) >= pick_n_eff or ji < 0 or ji >= n_items:
+                return
+            uid = items[ji].uid()
+            if not allow_recent and uid in recent:
                 return
             q = self._question_from_bank_typed(items[ji], question_type, topic, difficulty)
             if not q:
@@ -561,12 +586,29 @@ class QuestionGenerator:
                 if len(final) >= pick_n_eff:
                     break
 
+        if len(final) < pick_n_eff:
+            for ji in ordered_pick:
+                _take(ji, allow_recent=True)
+                if len(final) >= pick_n_eff:
+                    break
+
+        if len(final) < pick_n_eff:
+            for j in range(n_items):
+                _take(j, allow_recent=True)
+                if len(final) >= pick_n_eff:
+                    break
+
         if not final:
             if progress_callback:
                 progress_callback(
                     "Не удалось собрать вопросы из учебника для этого типа — блок пропускается."
                 )
             return []
+
+        recent.update(q.bank_uid for q in final if q.bank_uid)
+        if len(recent) > max(120, target_count * 12):
+            keep = set(candidate_uids[-max(1, target_count):])
+            recent.intersection_update(keep)
 
         return final[:pick_n_eff]
 

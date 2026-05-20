@@ -22,6 +22,7 @@ _STOP = frozenset(
     чтобы или все также только ещё еще их его ее её им
     древний древняя древнее древнего древней древние древних древним древними
     мир мира миру мире мировой история истории исторический историческая исторические
+    война войны войне войну войной войнах
     """.split()
 )
 _TOPIC_GROUPS: dict[str, tuple[str, ...]] = {
@@ -125,6 +126,42 @@ def _topic_search_terms(topic: str, extra: str) -> set[str]:
 
 def _literal_topic_terms(topic: str) -> set[str]:
     return {t for t in _token_set(topic) if len(t) >= 5 and t not in _STOP}
+
+
+def _term_in_text(term: str, text_l: str) -> bool:
+    if term in text_l:
+        return True
+    if len(term) >= 6 and term[:-2] in text_l:
+        return True
+    if len(term) >= 8 and term[:-3] in text_l:
+        return True
+    return False
+
+
+def _section_numbers(text: str) -> set[str]:
+    if not text:
+        return set()
+    out: set[str] = set()
+    for m in re.finditer(r"(?:§|параграф|п\.)\s*(\d{1,3})(?:\s*[—-]\s*(\d{1,3}))?", text.lower()):
+        out.add(m.group(1))
+        if m.group(2):
+            out.add(m.group(2))
+    return out
+
+
+def _bank_item_section_numbers(bi: "BankItem") -> set[str]:
+    out = _section_numbers(bi.section_title)
+    src = bi.raw.get("source") if isinstance(bi.raw.get("source"), dict) else {}
+    out.update(_section_numbers(str(src.get("paragraph", ""))))
+    m = re.fullmatch(r"s(\d{1,3})(?:-\d{1,3})?\.json", bi.source_file.lower())
+    if m:
+        out.add(str(int(m.group(1))))
+    return out
+
+
+def _section_title_tokens(section_title: str) -> set[str]:
+    cleaned = re.sub(r"^§\s*\d+(?:\s*[—-]\s*\d+)?\s*", "", section_title or "")
+    return {t for t in _token_set(cleaned) if len(t) >= 4}
 
 
 def _matches_topic_guard(topic_l: str, extra_l: str, blob_l: str) -> bool:
@@ -323,10 +360,24 @@ class QuestionBankIndex:
         score = 0.0
         topic_l = topic.lower().strip()
         sec_l = (bi.section_title or "").lower()
+        requested_sections = _section_numbers(combined)
+        if requested_sections:
+            item_sections = _bank_item_section_numbers(bi)
+            if requested_sections & item_sections:
+                score += 35.0
+            else:
+                score -= 12.0
         if topic_l and len(topic_l) >= 6 and topic_l in sec_l:
             score += 12.0
         if topic_l and len(topic_l) >= 4 and sec_l in topic_l:
             score += 10.0
+        topic_terms = {t for t in _token_set(topic) if len(t) >= 4 and t not in _STOP}
+        section_terms = _section_title_tokens(bi.section_title)
+        if topic_terms and section_terms:
+            section_hits = len(topic_terms & section_terms)
+            score += section_hits * 5.0
+            if section_hits >= max(1, min(3, len(topic_terms))):
+                score += 8.0
         src = bi.raw.get("source") if isinstance(bi.raw.get("source"), dict) else {}
         para = str(src.get("paragraph", "")).lower()
         for m in re.finditer(r"[§]\s*\d+", combined):
@@ -338,7 +389,7 @@ class QuestionBankIndex:
         hit = len(key_toks & _token_set(blob_l))
         score += float(hit) * 4.0
         for t in key_toks:
-            if len(t) >= 5 and t in blob_l:
+            if len(t) >= 5 and _term_in_text(t, blob_l):
                 score += 4.0
         intents = _topic_groups(combined)
         for g in intents:
@@ -371,13 +422,41 @@ def filter_scored_items(
             continue
         sc = QuestionBankIndex.score_item(bi, topic, extra)
         scored.append((sc, bi))
+    requested_sections = _section_numbers(f"{topic_l}\n{extra_l}")
+    strong_source_files: set[str] = set()
+    if not requested_sections and scored:
+        best_by_source: dict[str, float] = {}
+        for sc, bi in scored:
+            best_by_source[bi.source_file] = max(best_by_source.get(bi.source_file, 0.0), sc)
+        strong_source_files = {src for src, best in best_by_source.items() if best >= 16.0}
+        if strong_source_files:
+            scored = [
+                (
+                    sc + min(18.0, best_by_source.get(bi.source_file, 0.0) * 0.6)
+                    if bi.source_file in strong_source_files
+                    else sc,
+                    bi,
+                )
+                for sc, bi in scored
+            ]
     scored.sort(key=lambda t: -t[0])
+    if requested_sections:
+        section_scored = [
+            (sc, bi)
+            for sc, bi in scored
+            if requested_sections & _bank_item_section_numbers(bi)
+        ]
+        if section_scored:
+            scored = section_scored
     literal_terms = _literal_topic_terms(topic)
     if literal_terms:
         literal_scored = [
             (sc, bi)
             for sc, bi in scored
-            if any(t in bi.search_blob().lower() for t in literal_terms)
+            if any(
+                _term_in_text(t, bi.search_blob().lower())
+                for t in literal_terms
+            )
         ]
         if literal_scored:
             scored = literal_scored
