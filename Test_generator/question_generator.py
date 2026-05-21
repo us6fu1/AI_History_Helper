@@ -1,7 +1,9 @@
 """
-Генерация и проверка вопросов: промпт к LLM → JSON → валидация.
+Генерация и проверка вопросов: быстрый подбор из JSON-банка → валидация.
 
 Кэш (опционально): HISTORY_TEST_GEN_CACHE=1 → data/gen_cache/ (или HISTORY_TEST_GEN_CACHE_DIR).
+LLM-подбор включён по умолчанию: модель выбирает номера из короткого списка.
+Переопределение: HISTORY_TEST_LLM_PICK=0 выключает LLM-подбор.
 Сброс при смене учебника (JSON) или GGUF.
 """
 from __future__ import annotations
@@ -24,12 +26,91 @@ _QUESTION_TAIL_TYPES = frozenset({"chronology", "match", "open"})
 _DIFF_SORT_KEY = {"easy": 0, "medium": 1, "hard": 2}
 _TAIL_TYPE_ORDER = {"chronology": 0, "match": 1, "open": 2}
 
+_FOUNDATION_TERMS = (
+    "кто", "что такое", "как назы", "какой", "какая", "какое", "где", "когда",
+    "кем был", "кто был", "царь", "князь", "император", "правитель",
+    "фараон", "полководец", "город", "страна", "государство",
+)
+_ACTION_TERMS = (
+    "что сделал", "чем заним", "основал", "создал", "построил", "завоевал",
+    "победил", "провел", "провёл", "издал", "принял", "ввел", "ввёл",
+    "реформа", "поход", "война", "сражение", "битва", "действие",
+)
+_MEANING_TERMS = (
+    "почему", "зачем", "какую роль", "роль сыграл", "значение", "последств",
+    "причин", "итог", "вывод", "повлиял", "объясняет", "связано",
+    "отличие", "сравн", "докажи", "подтверди",
+)
+
+
+def _contains_any_term(text: str, terms: tuple[str, ...]) -> bool:
+    return any(term in text for term in terms)
+
+
+def _learning_stage(q: "Question") -> int:
+    """0: базовое узнавание, 1: действия/события, 2: причины и значение."""
+    blob = f"{q.text} {' '.join(q.options or [])}".lower()
+    if _contains_any_term(blob, _MEANING_TERMS):
+        return 2
+    if _contains_any_term(blob, _ACTION_TERMS):
+        return 1
+    if _contains_any_term(blob, _FOUNDATION_TERMS):
+        return 0
+    return 1
+
+
+def _first_int(text: str, default: int = 9999) -> int:
+    m = re.search(r"\d+", text or "")
+    return int(m.group(0)) if m else default
+
+
+def _source_order(q: "Question") -> tuple[int, int]:
+    return (
+        _first_int(q.source_paragraph),
+        _first_int(q.source_page),
+    )
+
+
+def _source_paragraph_order(q: "Question") -> int:
+    return _first_int(q.source_paragraph)
+
+
+def _source_page_order(q: "Question") -> int:
+    return _first_int(q.source_page)
+
+
+def _standalone_question_text(text: str, topic: str = "") -> str:
+    """Убирает привязки к невидимому контексту учебника из текста вопроса."""
+    s = re.sub(r"\s+", " ", (text or "").strip())
+    topic_l = (topic or "").lower()
+
+    if "древн" in topic_l and "егип" in topic_l:
+        s = re.sub(
+            r"Где возникла одна из древнейших цивилизаций, о которой ид[её]т речь\?",
+            "Где возникла древнеегипетская цивилизация?",
+            s,
+            flags=re.I,
+        )
+
+    cleanup = (
+        (r",?\s*о котор(?:ой|ом|ых)\s+ид[её]т\s+речь", ""),
+        (r"\s+в\s+данном\s+тексте", ""),
+        (r"\s+в\s+этом\s+тексте", ""),
+        (r"\s+из\s+текста", ""),
+        (r"\s+по\s+тексту\s+учебника", ""),
+        (r"\s+по\s+учебнику", ""),
+        (r"\s+согласно\s+учебнику", ""),
+    )
+    for pattern, repl in cleanup:
+        s = re.sub(pattern, repl, s, flags=re.I)
+    return re.sub(r"\s+", " ", s).strip()
+
 
 def sort_questions_for_test(questions: list["Question"]) -> list["Question"]:
     """
-    Простые (easy) перед сложными; хронология, сопоставление и открытые — в конце.
-    Среди «хвоста» порядок: хронология → сопоставление → открытый; внутри группы —
-    по возрастанию сложности.
+    Сначала идут вопросы из меньшего параграфа/более ранней страницы.
+    Внутри одного источника: базовые вопросы перед аналитическими; задания
+    хронологии, сопоставления и открытые — после тестовых.
     """
 
     def _dr(q: "Question") -> int:
@@ -39,16 +120,40 @@ def sort_questions_for_test(questions: list["Question"]) -> list["Question"]:
         qt = (q.question_type or "test").lower()
         return _TAIL_TYPE_ORDER.get(qt, 99)
 
-    head = [q for q in questions if (q.question_type or "test").lower() not in _QUESTION_TAIL_TYPES]
-    tail = [q for q in questions if (q.question_type or "test").lower() in _QUESTION_TAIL_TYPES]
-    head.sort(key=_dr)
-    tail.sort(key=lambda q: (_tail_ord(q), _dr(q)))
-    return head + tail
+    def _is_tail(q: "Question") -> int:
+        return 1 if (q.question_type or "test").lower() in _QUESTION_TAIL_TYPES else 0
+
+    def _within_source_order(q: "Question") -> tuple[int, int, int, str]:
+        if _is_tail(q):
+            return (1, _tail_ord(q), _dr(q), _normalize_for_sort(q.text))
+        return (0, _learning_stage(q), _dr(q), _normalize_for_sort(q.text))
+
+    return sorted(
+        questions,
+        key=lambda q: (
+            _source_paragraph_order(q),
+            _within_source_order(q),
+            _source_page_order(q),
+        ),
+    )
+
+
+def _normalize_for_sort(text: str) -> str:
+    text = text.lower().strip()
+    text = re.sub(r"\s+", " ", text)
+    return text
 
 
 def _gen_cache_enabled() -> bool:
     v = os.environ.get("HISTORY_TEST_GEN_CACHE", "0").strip().lower()
     return v in ("1", "true", "yes", "on")
+
+
+def _llm_pick_enabled(custom_prompt: str = "") -> bool:
+    v = os.environ.get("HISTORY_TEST_LLM_PICK", "1").strip().lower()
+    if v in ("0", "false", "no", "off"):
+        return False
+    return True
 
 
 def _gen_cache_dir() -> str:
@@ -118,7 +223,7 @@ class QuestionGenerator:
     ) -> dict:
         mp, mm, ms = _file_fingerprint(getattr(self.model, "model_path", "") or "")
         return {
-            "schema": 5,
+            "schema": 6,
             "topic": topic.strip().lower(),
             "question_type": question_type,
             "count": int(count),
@@ -219,7 +324,7 @@ class QuestionGenerator:
                     progress_callback(
                         "Загружено из локального кэша (те же параметры и файлы — без LLM)."
                     )
-                return cached
+                return sort_questions_for_test(cached)
 
         target_count = max(1, int(count))
 
@@ -243,7 +348,7 @@ class QuestionGenerator:
             for q in questions:
                 q.explanation = ""
 
-        questions = questions[:target_count]
+        questions = sort_questions_for_test(questions[:target_count])
 
         diff_seq = self._build_difficulty_sequence(len(questions), difficulty)
         for i, q in enumerate(questions):
@@ -293,7 +398,10 @@ class QuestionGenerator:
             ca = str(cans[0]).strip() if isinstance(cans, list) and cans else ""
             q = Question(
                 question_type="test",
-                text=str(raw.get("question") or raw.get("text") or "").strip(),
+                text=_standalone_question_text(
+                    str(raw.get("question") or raw.get("text") or ""),
+                    topic,
+                ),
                 options=opts,
                 correct_answer=ca,
                 explanation=str(raw.get("explanation") or "").strip(),
@@ -307,7 +415,10 @@ class QuestionGenerator:
             return q
 
         if ui_type == "open":
-            txt = str(raw.get("question") or raw.get("text") or "").strip()
+            txt = _standalone_question_text(
+                str(raw.get("question") or raw.get("text") or ""),
+                topic,
+            )
             ca = raw.get("correct_answer")
             if isinstance(ca, str) and ca.strip():
                 ans = ca.strip()
@@ -345,7 +456,10 @@ class QuestionGenerator:
             rng.shuffle(opts)
             return Question(
                 question_type="chronology",
-                text=str(raw.get("question") or raw.get("text") or "").strip(),
+                text=_standalone_question_text(
+                    str(raw.get("question") or raw.get("text") or ""),
+                    topic,
+                ),
                 options=opts,
                 correct_answer=" → ".join(seq),
                 explanation=str(raw.get("explanation") or "").strip(),
@@ -385,7 +499,10 @@ class QuestionGenerator:
             rng.shuffle(opts)
             return Question(
                 question_type="match",
-                text=str(raw.get("question") or raw.get("text") or "").strip(),
+                text=_standalone_question_text(
+                    str(raw.get("question") or raw.get("text") or ""),
+                    topic,
+                ),
                 options=opts,
                 correct_answer="; ".join(ordered_pairs),
                 explanation=str(raw.get("explanation") or "").strip(),
@@ -439,7 +556,11 @@ class QuestionGenerator:
                 )
             return []
         pick_n = min(target_count, len(scored))
-        max_led = min(len(scored), max(24, pick_n * 6), 56)
+        use_llm_pick = _llm_pick_enabled(custom_prompt)
+        if use_llm_pick:
+            max_led = min(len(scored), max(pick_n, min(max(12, pick_n * 3), 24)))
+        else:
+            max_led = min(len(scored), max(24, pick_n * 6), 56)
         lines, items = build_compact_pick_ledger(
             scored,
             max_items=max_led,
@@ -476,13 +597,18 @@ class QuestionGenerator:
 
         extra = ""
         if cp:
-            extra = "\nПожелания: " + cp
+            extra = (
+                "\nДополнительные инструкции (главный приоритет, важнее общей темы): "
+                + cp
+            )
 
         ledger_text = "\n".join(lines)
         user_prompt = (
             f"Тема: «{topic_s}». Тип: {type_ru.get(question_type, question_type)}.\n"
             f"Выбери ровно {pick_n} разных номеров из списка (1…{n_items}), релевантных теме. "
+            "Если есть дополнительные инструкции, сначала выполняй их; не выбирай номера, которые им противоречат. "
             "Список уже отсортирован по релевантности: предпочитай верхние номера и не бери вопросы, которые лишь косвенно похожи на тему."
+            " Нужна учебная лестница: сначала базовое узнавание персонажа, понятия, места или времени; затем действия и события; в конце причины, значение, последствия и выводы."
             f"{extra}\n"
             'Ответ только JSON: {"pick":[числа]}\n\n'
             f"{ledger_text}"
@@ -492,30 +618,33 @@ class QuestionGenerator:
             {"role": "user", "content": user_prompt},
         ]
         raw = ""
-        out_cap = min(140, 20 + pick_n * 10)
-        try:
-            raw = self.model.generate_chat(
-                messages,
-                max_tokens=out_cap,
-                temperature=0.12,
-                response_format={"type": "json_object"},
-            )
-        except TypeError:
+        out_cap = min(90, 16 + pick_n * 8)
+        if use_llm_pick:
+            if progress_callback:
+                progress_callback("Умный подбор вопросов...")
             try:
                 raw = self.model.generate_chat(
                     messages,
                     max_tokens=out_cap,
                     temperature=0.12,
+                    response_format={"type": "json_object"},
                 )
+            except TypeError:
+                try:
+                    raw = self.model.generate_chat(
+                        messages,
+                        max_tokens=out_cap,
+                        temperature=0.12,
+                    )
+                except Exception as e_chat:
+                    logger.warning("Подбор из учебника: chat без формата не удался (%s)", e_chat)
+                    raw = ""
             except Exception as e_chat:
-                logger.warning("Подбор из учебника: chat без формата не удался (%s)", e_chat)
+                # Переполнение контекста или сбой бэкенда — берём номера по релевантности без LLM.
+                logger.warning("Подбор из учебника: chat-LLM недоступен (%s)", e_chat)
+                if progress_callback:
+                    progress_callback("Генерация теста")
                 raw = ""
-        except Exception as e_chat:
-            # Переполнение контекста или сбой бэкенда — берём номера по релевантности без LLM
-            logger.warning("Подбор из учебника: chat-LLM недоступен (%s)", e_chat)
-            if progress_callback:
-                progress_callback("Генерация теста")
-            raw = ""
 
         picked_idx: list[int] = []
         parsed = self.model.extract_json(raw)
@@ -598,6 +727,15 @@ class QuestionGenerator:
                 if len(final) >= pick_n_eff:
                     break
 
+        if question_type == "test":
+            final = self._ensure_test_progression(
+                final,
+                items,
+                topic=topic,
+                difficulty=difficulty,
+                recent=recent,
+            )
+
         if not final:
             if progress_callback:
                 progress_callback(
@@ -611,6 +749,76 @@ class QuestionGenerator:
             recent.intersection_update(keep)
 
         return final[:pick_n_eff]
+
+    def _ensure_test_progression(
+        self,
+        final: list[Question],
+        candidate_items: list,
+        *,
+        topic: str,
+        difficulty: str,
+        recent: set[str],
+    ) -> list[Question]:
+        """Добавляет в тест базовую учебную лестницу, если в кандидатах есть подходящие вопросы."""
+        if len(final) < 3:
+            return final
+
+        def _stage_counts() -> dict[int, int]:
+            out: dict[int, int] = {}
+            for q in final:
+                st = _learning_stage(q)
+                out[st] = out.get(st, 0) + 1
+            return out
+
+        used_uids = {q.bank_uid for q in final if q.bank_uid}
+        used_texts = {self._normalize_text(q.text) for q in final if q.text}
+        counts = _stage_counts()
+
+        for wanted_stage in (0, 1, 2):
+            if counts.get(wanted_stage, 0) > 0:
+                continue
+
+            replacement: Optional[Question] = None
+            for bi in candidate_items:
+                uid = bi.uid()
+                if uid in used_uids or uid in recent:
+                    continue
+                q = self._question_from_bank_typed(bi, "test", topic, difficulty)
+                if not q or _learning_stage(q) != wanted_stage:
+                    continue
+                text_key = self._normalize_text(q.text)
+                if not text_key or text_key in used_texts:
+                    continue
+                replacement = q
+                break
+
+            if replacement is None:
+                continue
+
+            replace_idx: Optional[int] = None
+            counts = _stage_counts()
+            for i in range(len(final) - 1, -1, -1):
+                st = _learning_stage(final[i])
+                if st != wanted_stage and counts.get(st, 0) > 1:
+                    replace_idx = i
+                    break
+
+            if replace_idx is None:
+                continue
+
+            old = final[replace_idx]
+            if old.bank_uid:
+                used_uids.discard(old.bank_uid)
+            if old.text:
+                used_texts.discard(self._normalize_text(old.text))
+
+            final[replace_idx] = replacement
+            if replacement.bank_uid:
+                used_uids.add(replacement.bank_uid)
+            used_texts.add(self._normalize_text(replacement.text))
+            counts = _stage_counts()
+
+        return final
 
     def _shuffle_single_choice_options(self, q: Question) -> None:
         """Перемешивает варианты теста; correct_answer остаётся той же строкой из списка."""

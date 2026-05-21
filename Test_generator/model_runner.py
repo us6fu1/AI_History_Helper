@@ -1111,6 +1111,8 @@ class ModelRegistry:
                 with open(config_file, "r", encoding="utf-8") as f:
                     cfg = json.load(f)
             cfg["last_model"] = path
+            cfg["last_model_dir"] = os.path.dirname(path)
+            cfg["last_model_filename"] = os.path.basename(path)
             if n_gpu_layers is not None:
                 cfg["last_n_gpu_layers"] = int(n_gpu_layers)
                 cfg["last_gpu_layers_auto"] = int(n_gpu_layers) == AUTO_N_GPU_LAYERS
@@ -1133,6 +1135,24 @@ class ModelRegistry:
             pass
         return AUTO_N_GPU_LAYERS
 
+    def get_last_model_dir(self) -> Optional[str]:
+        config_file = os.path.join(os.path.dirname(self.REGISTRY_FILE), "config.json")
+        try:
+            if os.path.exists(config_file):
+                with open(config_file, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                path = cfg.get("last_model")
+                if path:
+                    model_dir = os.path.dirname(path)
+                    if model_dir and os.path.isdir(model_dir):
+                        return model_dir
+                model_dir = cfg.get("last_model_dir")
+                if model_dir and os.path.isdir(model_dir):
+                    return model_dir
+        except Exception:
+            pass
+        return None
+
     def get_last_model_path(self) -> Optional[str]:
         config_file = os.path.join(os.path.dirname(self.REGISTRY_FILE), "config.json")
         try:
@@ -1142,6 +1162,16 @@ class ModelRegistry:
                 path = cfg.get("last_model")
                 if path and os.path.exists(path):
                     return path
+                model_dir = cfg.get("last_model_dir") or (
+                    os.path.dirname(path) if path else ""
+                )
+                filename = cfg.get("last_model_filename") or (
+                    os.path.basename(path) if path else ""
+                )
+                if model_dir and filename:
+                    candidate = os.path.join(model_dir, filename)
+                    if os.path.exists(candidate):
+                        return candidate
         except Exception:
             pass
         return None

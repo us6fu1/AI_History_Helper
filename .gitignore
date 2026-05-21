@@ -40,3 +40,18 @@ Test_generator/assets/*_before_custom_icon.*
 *.swp
 .DS_Store
 Thumbs.db
+
+# Generated Office exports
+Materials/Тесты Docx/
+*.doc
+*.docx
+*.docm
+*.dot
+*.dotx
+*.ppt
+*.pptx
+*.pptm
+*.pot
+*.potx
+*.pps
+*.ppsx

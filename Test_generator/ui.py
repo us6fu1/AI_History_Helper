@@ -535,9 +535,9 @@ STYLE_SIDEBAR_BTN_ACTIVE = f"""
         background-color: {COLORS['sidebar_active']};
         color: {COLORS['sidebar_text']};
         border: 1px solid {COLORS['sidebar_active_border']};
-        border-left: 3px solid {COLORS['green']};
-        border-radius: 10px;
-        padding: 11px 14px 11px 12px;
+        border-left: 4px solid {COLORS['green']};
+        border-radius: 9px;
+        padding: 11px 14px 11px 13px;
         font-size: 13px;
         font-weight: 600;
         text-align: left;
@@ -549,8 +549,8 @@ STYLE_SIDEBAR_BTN_INACTIVE = f"""
         background-color: transparent;
         color: {COLORS['sidebar_text']};
         border: 1px solid transparent;
-        border-radius: 10px;
-        padding: 11px 14px;
+        border-radius: 9px;
+        padding: 11px 14px 11px 17px;
         font-size: 13px;
         font-weight: 500;
         text-align: left;
@@ -1307,7 +1307,10 @@ class ModelSettingsPage(QWidget):
         # Модель хранится вне приложения, чтобы установщик не весил несколько гигабайт.
         try:
             EXTERNAL_MODELS_DIR.mkdir(parents=True, exist_ok=True)
-            default_dir = str(EXTERNAL_MODELS_DIR)
+            default_dir = (
+                self.registry.get_last_model_dir()
+                or str(EXTERNAL_MODELS_DIR)
+            )
         except Exception:
             default_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "models")
             if not os.path.exists(default_dir):
@@ -1318,12 +1321,20 @@ class ModelSettingsPage(QWidget):
         )
         if path:
             self.path_edit.setText(path)
+            self.registry.save_last_model_path(
+                path,
+                n_gpu_layers=self._auto_gpu_layers,
+            )
 
     def _load_model(self):
         path = self.path_edit.text().strip()
         if not path:
             QMessageBox.warning(self, "Ошибка", "Укажите путь к файлу модели (.gguf)")
             return
+        self.registry.save_last_model_path(
+            path,
+            n_gpu_layers=self._auto_gpu_layers,
+        )
 
         self.load_btn.setEnabled(False)
         self.status_label.setText("Загрузка...")
@@ -3396,6 +3407,9 @@ class MainWindow(QMainWindow):
 
         # Инициализируем компоненты
         self._init_components()
+        self._auto_model_worker: Optional[ModelLoadWorker] = None
+        self._auto_model_loading = False
+        self._auto_model_error = ""
 
         # Строим UI
         self._build_ui()
@@ -3411,8 +3425,8 @@ class MainWindow(QMainWindow):
         self._status_timer.timeout.connect(self._update_status_bar)
         self._status_timer.start(2000)
 
-        # Загружаем последнюю модель если есть
-        self._try_auto_load_model()
+        # Загружаем последнюю модель после старта event loop, чтобы UI не пропускал статус и сигналы.
+        QTimer.singleShot(500, self._try_auto_load_model)
 
         # Загружаем последний учебник из реестра, если есть
         self._try_auto_load_textbook()
@@ -3423,6 +3437,7 @@ class MainWindow(QMainWindow):
             st.stop()
         MainWindow._join_worker(getattr(self, "_generation_worker", None))
         MainWindow._join_worker(getattr(self, "_assistant_worker", None))
+        MainWindow._join_worker(getattr(self, "_auto_model_worker", None))
         MainWindow._join_worker(getattr(self.textbooks_page, "_pdf_worker", None))
         MainWindow._join_worker(getattr(self.model_page, "worker", None))
         super().closeEvent(event)
@@ -3519,7 +3534,7 @@ class MainWindow(QMainWindow):
         """Тёмный графитовый sidebar с градиентом, логотипом и иконками меню."""
         sidebar = QWidget()
         sidebar.setObjectName("Sidebar")
-        sidebar.setFixedWidth(232)
+        sidebar.setFixedWidth(256)
         sidebar.setStyleSheet(f"""
             QWidget#Sidebar {{
                 background: qlineargradient(
@@ -3533,13 +3548,13 @@ class MainWindow(QMainWindow):
         """)
 
         lay = QVBoxLayout(sidebar)
-        lay.setSpacing(4)
-        lay.setContentsMargins(0, 8, 0, 22)
+        lay.setSpacing(6)
+        lay.setContentsMargins(16, 14, 16, 22)
 
         logo_frame = QFrame()
         logo_frame.setStyleSheet(f"QFrame {{ background: {COLORS['sidebar_bg_top']}; border: none; }}")
         logo_lay = QVBoxLayout(logo_frame)
-        logo_lay.setContentsMargins(16, 8, 16, 8)
+        logo_lay.setContentsMargins(8, 4, 8, 10)
         logo_lay.setSpacing(0)
 
         logo_icon = QLabel()
@@ -3547,7 +3562,7 @@ class MainWindow(QMainWindow):
         if LOGO_PATH.exists():
             pixmap = QPixmap(str(LOGO_PATH))
             if not pixmap.isNull():
-                target_width = 156
+                target_width = 148
                 dpr = 2.0
                 scaled_pixmap = pixmap.scaled(
                     int(target_width * dpr), 
@@ -3562,7 +3577,7 @@ class MainWindow(QMainWindow):
 
         logo_lay.addWidget(logo_icon, 0, Qt.AlignmentFlag.AlignCenter)
         lay.addWidget(logo_frame)
-        lay.addSpacing(8)
+        lay.addSpacing(10)
 
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.HLine)
@@ -3571,7 +3586,7 @@ class MainWindow(QMainWindow):
             "border: none; max-height: 1px; }"
         )
         lay.addWidget(sep)
-        lay.addSpacing(14)
+        lay.addSpacing(12)
 
         section_lbl = QLabel("МЕНЮ")
         section_lbl.setStyleSheet(f"""
@@ -3582,7 +3597,7 @@ class MainWindow(QMainWindow):
                 letter-spacing: 1.4px;
                 background: transparent;
                 border: none;
-                padding: 0 6px 6px 6px;
+                padding: 0 4px 6px 4px;
             }}
         """)
         lay.addWidget(section_lbl)
@@ -3604,7 +3619,7 @@ class MainWindow(QMainWindow):
             btn.setStyleSheet(
                 STYLE_SIDEBAR_BTN_ACTIVE if key == "home" else STYLE_SIDEBAR_BTN_INACTIVE
             )
-            btn.setMinimumHeight(40)
+            btn.setMinimumHeight(42)
             btn.setCheckable(False)
             btn.clicked.connect(lambda _, k=key: self._nav_clicked(k))
             lay.addWidget(btn)
@@ -3721,22 +3736,92 @@ class MainWindow(QMainWindow):
         GPU/CPU выбираются автоматически, если пользователь не задал ручной режим.
         HISTORY_TEST_N_GPU_LAYERS всё ещё может переопределить GPU-слои.
         """
-        path = self.model_registry.get_last_model_path()
-        if path and os.path.exists(path):
-            try:
-                from model_runner import AUTO_N_GPU_LAYERS
+        if self.model_runner.is_loaded:
+            self._update_status_bar()
+            return
 
-                self.model_runner.load_model(
-                    path,
-                    n_ctx=None,
-                    n_threads=None,
-                    n_gpu_layers=AUTO_N_GPU_LAYERS,
-                    n_batch=256,
+        path = self.model_registry.get_last_model_path()
+        if not path or not os.path.exists(path):
+            self._update_status_bar()
+            return
+
+        try:
+            from model_runner import AUTO_N_GPU_LAYERS
+
+            self._auto_model_worker = ModelLoadWorker(
+                self.model_runner,
+                path,
+                n_ctx=None,
+                n_threads=None,
+                n_gpu_layers=AUTO_N_GPU_LAYERS,
+                n_batch=256,
+            )
+            self._auto_model_worker.progress.connect(self._on_auto_model_progress)
+            self._auto_model_worker.model_load_finished.connect(
+                lambda ok, p=path: self._on_auto_model_loaded(ok, p)
+            )
+            self._auto_model_worker.model_load_error.connect(
+                self._on_auto_model_error
+            )
+            self._auto_model_loading = True
+            self._auto_model_error = ""
+            if hasattr(self, "model_page"):
+                self.model_page.path_edit.setText(path)
+                self.model_page.load_btn.setEnabled(False)
+                self.model_page.status_label.setText("Автозагрузка модели...")
+                self.model_page.status_label.setStyleSheet(
+                    f"color: {COLORS['warning']}; font-size: 12px; background: transparent; border: none;"
                 )
-                if hasattr(self, "model_page"):
-                    self.model_page._update_auto_values_labels()
-            except Exception as e:
-                logger.warning(f"Автозагрузка модели не удалась: {e}")
+            self._auto_model_worker.start()
+        except Exception as e:
+            self._auto_model_loading = False
+            self._auto_model_error = str(e)
+            logger.warning(f"Автозагрузка модели не удалась: {e}")
+        self._update_status_bar()
+
+    def _on_auto_model_progress(self, msg: str):
+        if hasattr(self, "model_page"):
+            self.model_page.progress_label.setText(msg)
+
+    def _on_auto_model_loaded(self, ok: bool, path: str):
+        self._auto_model_loading = False
+        if ok:
+            from model_runner import AUTO_N_GPU_LAYERS
+
+            self.model_registry.save_last_model_path(
+                path,
+                n_gpu_layers=AUTO_N_GPU_LAYERS,
+            )
+            if hasattr(self, "model_page"):
+                self.model_page.status_label.setText(
+                    f"Загружена: {self.model_runner.model_name}"
+                )
+                self.model_page.status_label.setStyleSheet(
+                    f"color: {COLORS['success']}; font-size: 12px; background: transparent; border: none;"
+                )
+                self.model_page.progress_label.setText("")
+                self.model_page.load_btn.setEnabled(True)
+                self.model_page.unload_btn.setEnabled(True)
+                self.model_page._update_auto_values_labels()
+        else:
+            self._auto_model_error = "модель не загрузилась"
+            if hasattr(self, "model_page"):
+                self.model_page.status_label.setText("Модель не загружена")
+                self.model_page.load_btn.setEnabled(True)
+                self.model_page.progress_label.setText("")
+        self._update_status_bar()
+
+    def _on_auto_model_error(self, msg: str):
+        self._auto_model_loading = False
+        self._auto_model_error = msg
+        logger.warning("Автозагрузка модели не удалась: %s", msg)
+        if hasattr(self, "model_page"):
+            self.model_page.status_label.setText(f"Автозагрузка не удалась: {msg[:80]}")
+            self.model_page.status_label.setStyleSheet(
+                f"color: {COLORS['error']}; font-size: 12px; background: transparent; border: none;"
+            )
+            self.model_page.load_btn.setEnabled(True)
+            self.model_page.progress_label.setText("")
         self._update_status_bar()
 
     def _try_auto_load_textbook(self):
@@ -4029,7 +4114,39 @@ class MainWindow(QMainWindow):
 
     def _update_status_bar(self):
         """Обновляет индикатор модели в sidebar (статус-бар внизу удалён)."""
-        if self.model_runner.is_loaded:
+        if getattr(self, "_auto_model_loading", False):
+            self.sidebar_status_dot.setText("●")
+            self.sidebar_status_dot.setStyleSheet(f"""
+                QLabel {{
+                    color: {COLORS['warning']};
+                    font-size: 14px;
+                    background: transparent;
+                    border: none;
+                }}
+            """)
+            self.sidebar_status_text.setText("Модель загружается")
+            self.sidebar_status_text.setStyleSheet(f"""
+                QLabel {{
+                    color: #FFFFFF;
+                    font-size: 11px;
+                    font-weight: 600;
+                    background: transparent;
+                    border: none;
+                }}
+            """)
+            path = self.model_registry.get_last_model_path() or ""
+            self.sidebar_model_name.setText(Path(path).stem[:30] if path else "автозагрузка")
+            self.sidebar_model_card.setStyleSheet(f"""
+                QFrame#ModelStatusCard {{
+                    background: rgba(255, 184, 77, 0.08);
+                    border: 1px solid rgba(255, 184, 77, 0.28);
+                    border-radius: 10px;
+                }}
+                QFrame#ModelStatusCard QLabel {{ background: transparent; border: none; }}
+            """)
+            if self.sidebar_model_card.graphicsEffect():
+                self.sidebar_model_card.setGraphicsEffect(None)
+        elif self.model_runner.is_loaded:
             mode = "GPU" if getattr(self.model_runner, "using_gpu", False) else "CPU"
             self.sidebar_status_dot.setText("●")
             self.sidebar_status_dot.setStyleSheet(f"""
@@ -4076,7 +4193,10 @@ class MainWindow(QMainWindow):
                     border: none;
                 }}
             """)
-            self.sidebar_status_text.setText("Модель не загружена")
+            if getattr(self, "_auto_model_error", ""):
+                self.sidebar_status_text.setText("Автозагрузка не удалась")
+            else:
+                self.sidebar_status_text.setText("Модель не загружена")
             self.sidebar_status_text.setStyleSheet(f"""
                 QLabel {{
                     color: {COLORS['sidebar_text_dim']};

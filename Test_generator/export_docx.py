@@ -38,6 +38,7 @@ _MATCH_PAIR_SEPARATORS = (
 )
 
 _LEFT_LABELS_MATCH = ["А", "Б", "В", "Г", "Д", "Е", "Ж", "З"]
+_CHOICE_BOX = "□"
 
 
 class DocxExporter:
@@ -77,6 +78,7 @@ class DocxExporter:
 
         self._setup_page(doc)
         self._add_header(doc, topic, textbook_name, variant_num, class_grade)
+        self._add_test_instructions(doc, questions)
         self._add_separator(doc)
 
         for i, question in enumerate(questions, start=1):
@@ -165,6 +167,45 @@ class DocxExporter:
                 value_run.bold = True
 
         doc.add_paragraph()
+
+    def _add_test_instructions(self, doc, questions: list):
+        q_types = {
+            (q if isinstance(q, dict) else q.to_dict()).get("question_type", "test")
+            for q in questions
+        }
+
+        parts = []
+        if "test" in q_types:
+            parts.append(
+                "в заданиях с вариантами ответа поставьте галочку или крестик "
+                "в квадрате рядом с тем ответом, который считаете правильным"
+            )
+        if "open" in q_types:
+            parts.append("в открытых вопросах запишите ответ на строках под заданием")
+        if "chronology" in q_types:
+            parts.append("в заданиях на хронологию расположите события в правильном порядке")
+        if "match" in q_types:
+            parts.append(
+                "в заданиях на сопоставление соедините пары или запишите соответствия"
+            )
+        if not parts:
+            return
+
+        para = doc.add_paragraph()
+        para.paragraph_format.left_indent = Cm(0.3)
+        para.paragraph_format.right_indent = Cm(0.3)
+        para.paragraph_format.space_after = Pt(8)
+
+        lead = para.add_run("Как выполнять работу: ")
+        lead.bold = True
+        lead.italic = True
+        lead.font.size = Pt(10)
+        lead.font.color.rgb = self.COLOR_GRAY
+
+        body = para.add_run("; ".join(parts) + ".")
+        body.italic = True
+        body.font.size = Pt(10)
+        body.font.color.rgb = self.COLOR_GRAY
 
     def _add_separator(self, doc):
         para = doc.add_paragraph()
@@ -364,17 +405,14 @@ class DocxExporter:
             src_run.font.color.rgb = self.COLOR_GRAY
             src_run.italic = True
 
-        option_letters = ["А", "Б", "В", "Г", "Д"]
-
         if q_type == "test" and options:
-            for j, option in enumerate(options[:4]):
+            for option in options[:4]:
                 opt_para = doc.add_paragraph()
                 opt_para.paragraph_format.left_indent = Cm(1)
 
-                letter = option_letters[j] if j < len(option_letters) else str(j + 1)
-                letter_run = opt_para.add_run(f"{letter}) ")
-                letter_run.font.size = Pt(11)
-                letter_run.font.color.rgb = self.COLOR_BLACK
+                box_run = opt_para.add_run(f"{_CHOICE_BOX} ")
+                box_run.font.size = Pt(12)
+                box_run.font.color.rgb = self.COLOR_BLACK
 
                 opt_run = opt_para.add_run(option)
                 opt_run.font.size = Pt(11)
@@ -473,8 +511,6 @@ class DocxExporter:
 
         doc.add_paragraph()
 
-        option_letters = ["А", "Б", "В", "Г", "Д"]
-
         for i, question in enumerate(questions, start=1):
             q = question if isinstance(question, dict) else question.to_dict()
             correct = q.get("correct_answer", "")
@@ -491,10 +527,9 @@ class DocxExporter:
             num_run.font.color.rgb = self.COLOR_BLACK
 
             if q_type == "test" and options:
-                for j, opt in enumerate(options[:4]):
+                for opt in options[:4]:
                     if opt.strip().lower() == correct.strip().lower():
-                        letter = option_letters[j] if j < len(option_letters) else str(j + 1)
-                        ans_run = ans_para.add_run(f"{letter}) {correct}")
+                        ans_run = ans_para.add_run(f"{_CHOICE_BOX} {correct}")
                         break
                 else:
                     ans_run = ans_para.add_run(correct)

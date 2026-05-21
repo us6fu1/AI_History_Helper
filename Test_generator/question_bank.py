@@ -128,7 +128,28 @@ def _literal_topic_terms(topic: str) -> set[str]:
     return {t for t in _token_set(topic) if len(t) >= 5 and t not in _STOP}
 
 
+def _focus_terms(text: str) -> set[str]:
+    terms = _literal_topic_terms(text)
+    lower = (text or "").lower()
+    if "фараон" in lower:
+        terms.update((
+            "фараон", "правител", "владык", "царь", "корон", "трон",
+            "скипетр", "плеть", "мина", "тутмос", "рамзес", "эхнатон",
+            "тутанхамон", "хуфу", "хеопс",
+        ))
+    return terms
+
+
+def _matches_focus_terms(bi: "BankItem", terms: set[str]) -> bool:
+    if not terms:
+        return False
+    blob_l = bi.answer_blob().lower()
+    return any(_term_in_text(t, blob_l) for t in terms)
+
+
 def _term_in_text(term: str, text_l: str) -> bool:
+    if len(term) <= 4:
+        return bool(re.search(r"\b" + re.escape(term), text_l))
     if term in text_l:
         return True
     if len(term) >= 6 and term[:-2] in text_l:
@@ -142,10 +163,26 @@ def _section_numbers(text: str) -> set[str]:
     if not text:
         return set()
     out: set[str] = set()
-    for m in re.finditer(r"(?:§|параграф|п\.)\s*(\d{1,3})(?:\s*[—-]\s*(\d{1,3}))?", text.lower()):
-        out.add(m.group(1))
-        if m.group(2):
-            out.add(m.group(2))
+    section_re = re.compile(
+        r"(?:§|парагр?а?ф\w*|п\.)\s*(\d{1,3})(?:\s*[—-]\s*(\d{1,3}))?"
+        r"|(\d{1,3})(?:\s*[—-]\s*(\d{1,3}))?\s*(?:§|парагр?а?ф\w*)",
+        re.I,
+    )
+    for m in section_re.finditer(text.lower()):
+        start_raw = m.group(1) or m.group(3)
+        end_raw = m.group(2) or m.group(4)
+        if not start_raw:
+            continue
+        start = int(start_raw)
+        end = int(end_raw) if end_raw else start
+        if end < start:
+            start, end = end, start
+        if end - start > 20:
+            out.add(str(start))
+            out.add(str(end))
+            continue
+        for n in range(start, end + 1):
+            out.add(str(n))
     return out
 
 
@@ -157,6 +194,16 @@ def _bank_item_section_numbers(bi: "BankItem") -> set[str]:
     if m:
         out.add(str(int(m.group(1))))
     return out
+
+
+def _bank_item_source_order(bi: "BankItem") -> tuple[int, int, str]:
+    sections = _bank_item_section_numbers(bi)
+    section_n = min((int(s) for s in sections if str(s).isdigit()), default=9999)
+    src = bi.raw.get("source") if isinstance(bi.raw.get("source"), dict) else {}
+    page_raw = str(src.get("page", ""))
+    m = re.search(r"\d+", page_raw)
+    page_n = int(m.group(0)) if m else 9999
+    return section_n, page_n, bi.uid()
 
 
 def _section_title_tokens(section_title: str) -> set[str]:
@@ -314,10 +361,37 @@ class BankItem:
                             self.raw.get("question") or self.raw.get("text") or ""]
         tags = self.raw.get("tags")
         if isinstance(tags, dict):
-            for key in ("themes", "concepts"):
+            for key in ("themes", "concepts", "entities", "processes", "periods", "geography"):
                 v = tags.get(key)
                 if isinstance(v, list):
                     parts.append(" ".join(str(x) for x in v))
+        return "\n".join(parts)
+
+    def detail_blob(self) -> str:
+        parts: list[str] = [self.search_blob()]
+        for key in ("options", "correct_answers", "acceptable_answers", "items", "left_items", "right_items", "correct_pairs"):
+            v = self.raw.get(key)
+            if isinstance(v, list):
+                parts.append(" ".join(str(x) for x in v))
+        for key in ("correct_answer", "explanation"):
+            v = self.raw.get(key)
+            if isinstance(v, str):
+                parts.append(v)
+        return "\n".join(parts)
+
+    def answer_blob(self) -> str:
+        parts: list[str] = [
+            self.section_title,
+            self.raw.get("question") or self.raw.get("text") or "",
+        ]
+        for key in ("correct_answers", "acceptable_answers", "items", "left_items", "right_items", "correct_pairs"):
+            v = self.raw.get(key)
+            if isinstance(v, list):
+                parts.append(" ".join(str(x) for x in v))
+        for key in ("correct_answer", "explanation"):
+            v = self.raw.get(key)
+            if isinstance(v, str):
+                parts.append(v)
         return "\n".join(parts)
 
 
@@ -415,14 +489,17 @@ def filter_scored_items(
     scored: list[tuple[float, BankItem]] = []
     topic_l = topic.lower().strip()
     extra_l = extra.lower().strip()
+    requested_sections = _section_numbers(f"{topic_l}\n{extra_l}")
+    focus_terms = set() if requested_sections else _focus_terms(extra_l)
     for bi in index.questions:
         if question_difficulty_numeric(bi.raw) > cap:
             continue
         if not _matches_topic_guard(topic_l, extra_l, bi.search_blob().lower()):
             continue
         sc = QuestionBankIndex.score_item(bi, topic, extra)
+        if focus_terms and _matches_focus_terms(bi, focus_terms):
+            sc += 80.0
         scored.append((sc, bi))
-    requested_sections = _section_numbers(f"{topic_l}\n{extra_l}")
     strong_source_files: set[str] = set()
     if not requested_sections and scored:
         best_by_source: dict[str, float] = {}
@@ -439,7 +516,15 @@ def filter_scored_items(
                 )
                 for sc, bi in scored
             ]
-    scored.sort(key=lambda t: -t[0])
+    scored.sort(key=lambda t: (-t[0], _bank_item_source_order(t[1])))
+    if focus_terms:
+        focused_scored = [
+            (sc, bi)
+            for sc, bi in scored
+            if _matches_focus_terms(bi, focus_terms)
+        ]
+        if focused_scored:
+            scored = focused_scored
     if requested_sections:
         section_scored = [
             (sc, bi)
@@ -450,16 +535,27 @@ def filter_scored_items(
             scored = section_scored
     literal_terms = _literal_topic_terms(topic)
     if literal_terms:
-        literal_scored = [
+        all_literal_scored = [
             (sc, bi)
             for sc, bi in scored
-            if any(
+            if all(
                 _term_in_text(t, bi.search_blob().lower())
                 for t in literal_terms
             )
         ]
-        if literal_scored:
-            scored = literal_scored
+        if all_literal_scored:
+            scored = all_literal_scored
+        else:
+            literal_scored = [
+                (sc, bi)
+                for sc, bi in scored
+                if any(
+                    _term_in_text(t, bi.search_blob().lower())
+                    for t in literal_terms
+                )
+            ]
+            if literal_scored:
+                scored = literal_scored
     return scored[: max(pool_size, 1)]
 
 
@@ -684,6 +780,15 @@ def is_well_formed_mc(raw: dict) -> bool:
     cleaned = [str(o).strip() for o in opts if str(o).strip()]
     if len(cleaned) != 4:
         return False
+    bad_option_patterns = (
+        r"\bпо\s+описанию\s+курса\b",
+        r"\bстрого\s+\d{3,4}\s+году\b",
+        r"\bянварские\s+праздники\s+рима\b",
+    )
+    for opt in cleaned:
+        opt_l = opt.lower()
+        if any(re.search(pattern, opt_l) for pattern in bad_option_patterns):
+            return False
     cans = raw.get("correct_answers")
     if not isinstance(cans, list) or not cans:
         return False
@@ -769,8 +874,17 @@ def build_compact_pick_ledger(
         sec = (bi.section_title or "").strip()
         if len(sec) > section_cap:
             sec = sec[: section_cap - 1] + "…"
+        cans = raw.get("correct_answers")
+        answer = ""
+        if isinstance(cans, list) and cans:
+            answer = str(cans[0]).strip().replace("\n", " ")
+        elif isinstance(raw.get("correct_answer"), str):
+            answer = str(raw.get("correct_answer")).strip().replace("\n", " ")
+        if len(answer) > 70:
+            answer = answer[:69] + "…"
         items.append(bi)
-        lines.append(f"{len(items)}. [{sec}] {t}")
+        suffix = f" | верно: {answer}" if answer else ""
+        lines.append(f"{len(items)}. [{sec}] {t}{suffix}")
     return lines, items
 
 

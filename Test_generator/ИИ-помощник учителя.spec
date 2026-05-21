@@ -5,7 +5,12 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('assets', 'assets'), ('data', 'data'), ('..\\Materials', 'Materials')],
+    datas=[
+        ('assets', 'assets'),
+        ('data\\models.json', 'data'),
+        ('data\\textbooks.json', 'data'),
+        ('..\\Materials', 'Materials'),
+    ],
     hiddenimports=['PySide6.QtSvg'],
     hookspath=[],
     hooksconfig={},
