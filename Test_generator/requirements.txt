@@ -1,4 +1,6 @@
+--extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+--only-binary=llama-cpp-python
 PySide6>=6.6.0
-llama-cpp-python==0.3.4
+llama-cpp-python==0.3.23
 python-docx>=1.1.0
 pypdf>=4.0.0

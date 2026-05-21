@@ -27,11 +27,11 @@ pip install "python-docx>=1.1.0"
 
 echo.
 echo [4/5] Установка llama-cpp-python (CPU-версия)...
-pip install --upgrade "llama-cpp-python>=0.3.0"
+pip install --upgrade --only-binary=llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu "llama-cpp-python==0.3.23"
 if errorlevel 1 (
     echo [ОШИБКА] Не удалось установить llama-cpp-python.
-    echo Проверьте версию Python (3.10/3.11/3.12) и наличие компилятора MSVC
-    echo (на Windows нужны Build Tools, если pip не нашёл готовый wheel).
+    echo Проверьте версию Python (3.10/3.11/3.12) и доступ к интернету.
+    echo Установщик использует готовый CPU wheel и не собирает llama-cpp-python из исходников.
     pause
     exit /b 1
 )
