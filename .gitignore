@@ -29,6 +29,9 @@ Test_generator/data/tests_history.json
 # PyInstaller / временные файлы сборки
 Test_generator/dist*/
 Test_generator/build/
+Test_generator/build_*/
+Test_generator/dist_*/
+СКАЧАТЬ-ГОТОВОЕ-ПРИЛОЖЕНИЕ-windows.zip
 
 # Временные файлы, созданные при подготовке иконки
 Test_generator/assets/app_icons/

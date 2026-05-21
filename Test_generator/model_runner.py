@@ -474,7 +474,7 @@ class ModelRunner:
         #   HISTORY_TEST_SPEC_TOKENS = 10 (4–16)
         #   HISTORY_TEST_SPEC_NGRAM  = 2  (2–3)
         draft_model = None
-        spec_enabled = os.environ.get("HISTORY_TEST_SPECULATIVE", "1") == "1"
+        spec_enabled = os.environ.get("HISTORY_TEST_SPECULATIVE", "0") == "1"
         if spec_enabled:
             try:
                 from llama_cpp.llama_speculative import LlamaPromptLookupDecoding

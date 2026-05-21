@@ -1376,6 +1376,13 @@ class ModelSettingsPage(QWidget):
         self.progress_label.setText("")
 
     def _on_error(self, msg: str):
+        if "0xc000001d" in msg.lower() or "-1073741795" in msg:
+            msg = (
+                f"{msg}\n\n"
+                "Эта ошибка обычно означает, что библиотека нейросети собрана под инструкции CPU, "
+                "которых нет на этом компьютере. Скачайте свежий релиз приложения: он должен быть "
+                "собран в совместимом CPU-режиме."
+            )
         self.status_label.setText(f"Ошибка: {msg[:80]}")
         self.status_label.setStyleSheet(
             f"color: {COLORS['error']}; font-size: 12px; background: transparent; border: none;"

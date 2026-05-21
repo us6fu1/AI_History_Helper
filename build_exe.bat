@@ -18,7 +18,10 @@ if not exist ".venv\Scripts\python.exe" (
 
 call ".venv\Scripts\activate.bat"
 python -m pip install --upgrade pip
-python -m pip install -r "Test_generator\requirements.txt" pyinstaller
+python -m pip install "PySide6>=6.6.0" "python-docx>=1.1.0" "pypdf>=4.0.0" pyinstaller cmake ninja
+set "FORCE_CMAKE=1"
+set "CMAKE_ARGS=-DGGML_NATIVE=OFF -DLLAMA_NATIVE=OFF -DGGML_AVX=OFF -DLLAMA_AVX=OFF -DGGML_AVX2=OFF -DLLAMA_AVX2=OFF -DGGML_FMA=OFF -DLLAMA_FMA=OFF -DGGML_F16C=OFF -DLLAMA_F16C=OFF -DGGML_CUDA=OFF -DLLAMA_CUBLAS=OFF"
+python -m pip install --force-reinstall --no-binary llama-cpp-python llama-cpp-python==0.3.4
 
 cd Test_generator
 pyinstaller --noconfirm "ИИ-помощник учителя.spec"
