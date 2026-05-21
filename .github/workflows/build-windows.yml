@@ -36,16 +36,27 @@ jobs:
 
       - name: Pack ZIP
         shell: pwsh
-        run: Compress-Archive -Path "Test_generator\dist\ИИ-помощник учителя" -DestinationPath "ИИ-помощник учителя-windows.zip" -Force
+        run: Compress-Archive -Path "Test_generator\dist\ИИ-помощник учителя" -DestinationPath "СКАЧАТЬ-ГОТОВОЕ-ПРИЛОЖЕНИЕ-windows.zip" -Force
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ИИ-помощник учителя-windows
-          path: ИИ-помощник учителя-windows.zip
+          name: СКАЧАТЬ-ГОТОВОЕ-ПРИЛОЖЕНИЕ-windows
+          path: СКАЧАТЬ-ГОТОВОЕ-ПРИЛОЖЕНИЕ-windows.zip
 
       - name: Upload release asset
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: ИИ-помощник учителя-windows.zip
+          body: |
+            Скачайте файл **СКАЧАТЬ-ГОТОВОЕ-ПРИЛОЖЕНИЕ-windows.zip** из раздела Assets.
+
+            Не скачивайте `Source code (zip)` и не запускайте `install.bat`: это исходный код для разработки.
+
+            Как запустить:
+            1. Распакуйте ZIP в любую папку.
+            2. Откройте папку `ИИ-помощник учителя`.
+            3. Запустите `ИИ-помощник учителя.exe`.
+
+            Python и библиотеки устанавливать не нужно. GGUF-модель скачивается отдельно и выбирается в настройках приложения.
+          files: СКАЧАТЬ-ГОТОВОЕ-ПРИЛОЖЕНИЕ-windows.zip
