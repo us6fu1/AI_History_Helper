@@ -34,6 +34,14 @@ jobs:
         working-directory: Test_generator
         run: pyinstaller --noconfirm "ИИ-помощник учителя.spec"
 
+      - name: Verify llama.cpp DLLs
+        shell: pwsh
+        run: |
+          $libDir = "Test_generator\dist\ИИ-помощник учителя\_internal\llama_cpp\lib"
+          if (!(Test-Path (Join-Path $libDir "llama.dll"))) {
+            Write-Error "Missing llama.cpp runtime DLLs in $libDir"
+          }
+
       - name: Prepare portable model folder
         shell: pwsh
         run: |

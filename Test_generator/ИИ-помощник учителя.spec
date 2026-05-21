@@ -1,17 +1,21 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from PyInstaller.utils.hooks import collect_dynamic_libs
+
+
+llama_cpp_binaries = collect_dynamic_libs('llama_cpp')
 
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[],
+    binaries=llama_cpp_binaries,
     datas=[
         ('assets', 'assets'),
         ('data\\models.json', 'data'),
         ('data\\textbooks.json', 'data'),
         ('..\\Materials', 'Materials'),
     ],
-    hiddenimports=['PySide6.QtSvg'],
+    hiddenimports=['PySide6.QtSvg', 'llama_cpp.llama_speculative'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
