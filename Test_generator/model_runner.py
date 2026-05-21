@@ -12,13 +12,75 @@ import subprocess
 from pathlib import Path
 from typing import Optional, Callable
 
-from app_paths import user_data_dir
+from app_paths import app_resource_dir, default_models_dir, repo_resource_dir, user_data_dir
 
 logger = logging.getLogger(__name__)
 
 # Размер контекста по умолчанию (llama.cpp / GGUF): промпт + ответ.
 DEFAULT_N_CTX = 8000
 AUTO_N_GPU_LAYERS = -2
+
+
+def _existing_model_search_dirs() -> list[Path]:
+    """Places where users commonly put the external GGUF model."""
+    dirs: list[Path] = [
+        default_models_dir(),
+        repo_resource_dir() / "models",
+        app_resource_dir() / "models",
+    ]
+
+    try:
+        exe_dir = Path(sys.executable).resolve().parent
+        dirs.extend([
+            exe_dir / "models",
+            exe_dir.parent / "models",
+        ])
+    except Exception:
+        pass
+
+    seen: set[str] = set()
+    existing: list[Path] = []
+    for directory in dirs:
+        try:
+            resolved = directory.resolve()
+        except Exception:
+            resolved = directory
+        key = os.path.normcase(str(resolved))
+        if key in seen or not resolved.is_dir():
+            continue
+        seen.add(key)
+        existing.append(resolved)
+    return existing
+
+
+def resolve_model_path(model_path: str, allow_any_model: bool = False) -> Optional[str]:
+    """
+    Resolves stale absolute paths after moving the app to another computer.
+    First tries the given path, then the same filename in known model folders.
+    """
+    raw = (model_path or "").strip().strip('"')
+    if raw:
+        path = Path(raw).expanduser()
+        if path.exists():
+            return str(path)
+
+        filename = path.name
+        if filename:
+            for directory in _existing_model_search_dirs():
+                candidate = directory / filename
+                if candidate.is_file():
+                    return str(candidate)
+
+    if allow_any_model:
+        for directory in _existing_model_search_dirs():
+            try:
+                models = sorted(directory.glob("*.gguf"))
+            except Exception:
+                models = []
+            if models:
+                return str(models[0])
+
+    return None
 
 
 def detect_logical_cores() -> int:
@@ -372,10 +434,15 @@ class ModelRunner:
         if n_ctx is None:
             n_ctx = choose_auto_context_tokens()
 
+        resolved_model_path = resolve_model_path(model_path)
+        if resolved_model_path:
+            model_path = resolved_model_path
+
         if not os.path.exists(model_path):
             raise FileNotFoundError(
                 f"Модель не найдена: {model_path}\n"
-                "Скачайте GGUF-файл и укажите путь к нему."
+                "Скачайте GGUF-файл и положите его в папку "
+                f"{default_models_dir()}, либо рядом с программой в папку models."
             )
 
         if not model_path.lower().endswith(".gguf"):
@@ -1061,6 +1128,10 @@ class ModelRegistry:
 
     def __init__(self):
         os.makedirs(os.path.dirname(self.REGISTRY_FILE), exist_ok=True)
+        try:
+            default_models_dir().mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
         self._data: list[dict] = self._load()
 
     def _load(self) -> list[dict]:
@@ -1151,6 +1222,9 @@ class ModelRegistry:
                     return model_dir
         except Exception:
             pass
+        search_dirs = _existing_model_search_dirs()
+        if search_dirs:
+            return str(search_dirs[0])
         return None
 
     def get_last_model_path(self) -> Optional[str]:
@@ -1160,8 +1234,9 @@ class ModelRegistry:
                 with open(config_file, "r", encoding="utf-8") as f:
                     cfg = json.load(f)
                 path = cfg.get("last_model")
-                if path and os.path.exists(path):
-                    return path
+                resolved = resolve_model_path(path or "")
+                if resolved:
+                    return resolved
                 model_dir = cfg.get("last_model_dir") or (
                     os.path.dirname(path) if path else ""
                 )
@@ -1174,4 +1249,4 @@ class ModelRegistry:
                         return candidate
         except Exception:
             pass
-        return None
+        return resolve_model_path("", allow_any_model=True)

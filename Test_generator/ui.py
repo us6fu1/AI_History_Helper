@@ -1364,8 +1364,10 @@ class ModelSettingsPage(QWidget):
             self.status_label.setStyleSheet(
                 f"color: {COLORS['success']}; font-size: 12px; background: transparent; border: none;"
             )
+            loaded_path = self.runner.model_path or self.path_edit.text().strip()
+            self.path_edit.setText(loaded_path)
             self.registry.save_last_model_path(
-                self.path_edit.text().strip(),
+                loaded_path,
                 n_gpu_layers=self._auto_gpu_layers,
             )
             self._update_auto_values_labels()

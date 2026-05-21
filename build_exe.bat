@@ -29,6 +29,12 @@ if errorlevel 1 (
     exit /b 1
 )
 
+set "APP_DIR=dist\ИИ-помощник учителя"
+if not exist "%APP_DIR%\models" mkdir "%APP_DIR%\models"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$p = Join-Path $env:APP_DIR 'models\PUT-GGUF-MODEL-HERE.txt'; 'Put a .gguf model file in this folder. The app will find it and load it automatically on next start.' | Set-Content -LiteralPath $p -Encoding UTF8"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Compress-Archive -Path $env:APP_DIR -DestinationPath '..\СКАЧАТЬ-ГОТОВОЕ-ПРИЛОЖЕНИЕ-windows.zip' -Force"
+
 echo.
 echo Done: Test_generator\dist\ИИ-помощник учителя\ИИ-помощник учителя.exe
+echo ZIP:  СКАЧАТЬ-ГОТОВОЕ-ПРИЛОЖЕНИЕ-windows.zip
 pause

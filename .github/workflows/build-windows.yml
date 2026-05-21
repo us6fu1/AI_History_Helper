@@ -34,6 +34,19 @@ jobs:
         working-directory: Test_generator
         run: pyinstaller --noconfirm "ИИ-помощник учителя.spec"
 
+      - name: Prepare portable model folder
+        shell: pwsh
+        run: |
+          $appDir = "Test_generator\dist\ИИ-помощник учителя"
+          $modelsDir = Join-Path $appDir "models"
+          New-Item -ItemType Directory -Force -Path $modelsDir | Out-Null
+          @(
+            "Положите GGUF-модель в эту папку."
+            ""
+            "Приложение само найдет файл .gguf и загрузит нейросеть при следующем запуске."
+            "Если моделей несколько, в настройках приложения можно выбрать нужный файл вручную."
+          ) | Set-Content -LiteralPath (Join-Path $modelsDir "ПОЛОЖИТЬ-МОДЕЛЬ-СЮДА.txt") -Encoding UTF8
+
       - name: Pack ZIP
         shell: pwsh
         run: Compress-Archive -Path "Test_generator\dist\ИИ-помощник учителя" -DestinationPath "СКАЧАТЬ-ГОТОВОЕ-ПРИЛОЖЕНИЕ-windows.zip" -Force
@@ -56,7 +69,8 @@ jobs:
             Как запустить:
             1. Распакуйте ZIP в любую папку.
             2. Откройте папку `ИИ-помощник учителя`.
-            3. Запустите `ИИ-помощник учителя.exe`.
+            3. Положите скачанную GGUF-модель в папку `models`.
+            4. Запустите `ИИ-помощник учителя.exe`.
 
-            Python и библиотеки устанавливать не нужно. GGUF-модель скачивается отдельно и выбирается в настройках приложения.
+            Python и библиотеки устанавливать не нужно. При повторном запуске приложение само найдет модель в папке `models` и загрузит нейросеть.
           files: СКАЧАТЬ-ГОТОВОЕ-ПРИЛОЖЕНИЕ-windows.zip
