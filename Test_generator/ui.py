@@ -719,7 +719,7 @@ class ModelLoadWorker(QThread):
         n_ctx: Optional[int] = None,
         n_threads: Optional[int] = None,
         n_gpu_layers: int = -2,
-        n_batch: int = 256,
+        n_batch: Optional[int] = None,
     ):
         super().__init__()
         self.runner = runner
@@ -1163,13 +1163,19 @@ class ModelSettingsPage(QWidget):
         self._auto_gpu_layers = AUTO_N_GPU_LAYERS
 
         try:
-            from model_runner import choose_auto_context_tokens, choose_auto_cpu_threads
+            from model_runner import (
+                choose_auto_batch_tokens,
+                choose_auto_context_tokens,
+                choose_auto_cpu_threads,
+            )
 
             auto_threads = choose_auto_cpu_threads()
             auto_ctx = choose_auto_context_tokens()
+            auto_batch = choose_auto_batch_tokens()
         except Exception:
             auto_threads = max(1, (os.cpu_count() or 4) // 2)
-            auto_ctx = 8000
+            auto_ctx = 6144
+            auto_batch = 512
 
         auto_label_style = (
             f"color: {COLORS['text_primary']}; font-size: 12px; "
@@ -1195,10 +1201,17 @@ class ModelSettingsPage(QWidget):
         )
         self.gpu_value_label.setStyleSheet(auto_label_style)
 
+        self.batch_value_label = QLabel(f"Авто: {auto_batch} токенов")
+        self.batch_value_label.setToolTip(
+            "Размер батча ускоряет обработку промпта. На ноутбуке 8 ядер / 16 ГБ обычно выбирается 768."
+        )
+        self.batch_value_label.setStyleSheet(auto_label_style)
+
         lbl_style = f"color: {COLORS['text_primary']}; font-size: 12px; font-weight: 600; background: transparent; border: none;"
         for lbl, widget in [
             ("Контекст:", self.ctx_value_label),
             ("Потоки CPU:", self.threads_value_label),
+            ("Батч:", self.batch_value_label),
             ("GPU:", self.gpu_value_label),
         ]:
             label = QLabel(lbl)
@@ -1207,7 +1220,7 @@ class ModelSettingsPage(QWidget):
 
         gpu_hint = QLabel(
             "Параметры железа выбираются автоматически при каждой загрузке модели: контекст — по RAM, "
-            "CPU-потоки — по ядрам процессора, GPU — по видеокарте и сборке llama-cpp-python."
+            "CPU-потоки — по ядрам процессора, батч — по RAM/CPU, GPU — по видеокарте и сборке llama-cpp-python."
         )
         gpu_hint.setWordWrap(True)
         gpu_hint.setStyleSheet(
@@ -1293,6 +1306,17 @@ class ModelSettingsPage(QWidget):
                 text = "Авто"
         self.threads_value_label.setText(text)
 
+        batch = info.get("n_batch")
+        if batch:
+            self.batch_value_label.setText(f"Авто: {batch} токенов")
+        else:
+            try:
+                from model_runner import choose_auto_batch_tokens
+
+                self.batch_value_label.setText(f"Авто: {choose_auto_batch_tokens()} токенов")
+            except Exception:
+                self.batch_value_label.setText("Авто")
+
         n_gl = info.get("n_gpu_layers")
         using_gpu = bool(info.get("using_gpu"))
         if n_gl is not None:
@@ -1351,7 +1375,7 @@ class ModelSettingsPage(QWidget):
             n_ctx=None,
             n_threads=None,
             n_gpu_layers=self._auto_gpu_layers,
-            n_batch=768,
+            n_batch=None,
         )
         self.worker.progress.connect(self.progress_label.setText)
         self.worker.model_load_finished.connect(self._on_loaded)
@@ -2314,8 +2338,9 @@ class TextbooksPage(QWidget):
         layout.addWidget(make_separator())
 
         hint = QLabel(
-            "Все учебники Мединского уже загружены. При необходимости можно загрузить свой PDF: "
-            "приложение создаст папку с JSON-вопросами и подключит её как новый учебник."
+            "Готовые учебники уже подключены и сразу доступны для генерации тестов. "
+            "При необходимости можно загрузить свой PDF: приложение создаст папку "
+            "с JSON-вопросами и подключит её как новый учебник."
         )
         hint.setStyleSheet(
             f"color: {COLORS['text_muted']}; font-size: 11px; background: transparent; border: none;"
@@ -3763,7 +3788,7 @@ class MainWindow(QMainWindow):
                 n_ctx=None,
                 n_threads=None,
                 n_gpu_layers=AUTO_N_GPU_LAYERS,
-                n_batch=256,
+                n_batch=None,
             )
             self._auto_model_worker.progress.connect(self._on_auto_model_progress)
             self._auto_model_worker.model_load_finished.connect(

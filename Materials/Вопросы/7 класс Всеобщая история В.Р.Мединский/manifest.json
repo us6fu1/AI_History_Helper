@@ -1,0 +1,117 @@
+{
+  "textbook": "Всеобщая история. История Нового времени, 7 класс, В. Р. Мединский (вопросы по основному тексту учебника + введение)",
+  "total_files": 22,
+  "total_questions": 440,
+  "files": [
+    {
+      "file": "intro-v01.json",
+      "section": "Введение — от Средневековья к Новому времени",
+      "questions": 20
+    },
+    {
+      "file": "s01.json",
+      "section": "§ 1 Мир на заре Нового времени",
+      "questions": 20
+    },
+    {
+      "file": "s02.json",
+      "section": "§ 2 Великие географические открытия",
+      "questions": 20
+    },
+    {
+      "file": "s03.json",
+      "section": "§ 3 Колониальные империи",
+      "questions": 20
+    },
+    {
+      "file": "s04.json",
+      "section": "§ 4 Сельский и городской мир",
+      "questions": 20
+    },
+    {
+      "file": "s05.json",
+      "section": "§ 5 Человек, общество, государство",
+      "questions": 20
+    },
+    {
+      "file": "s06.json",
+      "section": "§ 6 Реформация и Контрреформация",
+      "questions": 20
+    },
+    {
+      "file": "s07.json",
+      "section": "§ 7 Германские земли",
+      "questions": 20
+    },
+    {
+      "file": "s08.json",
+      "section": "§ 8 Испанская монархия",
+      "questions": 20
+    },
+    {
+      "file": "s09.json",
+      "section": "§ 9 Нидерланды: путь к расцвету",
+      "questions": 20
+    },
+    {
+      "file": "s10.json",
+      "section": "§ 10 Франция: становление абсолютизма",
+      "questions": 20
+    },
+    {
+      "file": "s11.json",
+      "section": "§ 11 Англия в XVI — начале XVII в.",
+      "questions": 20
+    },
+    {
+      "file": "s12.json",
+      "section": "§ 12 Век революций в Англии",
+      "questions": 20
+    },
+    {
+      "file": "s13.json",
+      "section": "§ 13 Сила и слабость Речи Посполитой",
+      "questions": 20
+    },
+    {
+      "file": "s14-15.json",
+      "section": "§ 14—15 Международные отношения",
+      "questions": 20
+    },
+    {
+      "file": "s16-17.json",
+      "section": "§ 16—17 Культура эпохи Возрождения",
+      "questions": 20
+    },
+    {
+      "file": "s18.json",
+      "section": "§ 18 Культура XVII в.: барокко и классицизм",
+      "questions": 20
+    },
+    {
+      "file": "s19.json",
+      "section": "§ 19 Научная революция",
+      "questions": 20
+    },
+    {
+      "file": "s20.json",
+      "section": "§ 20 Османская империя и Иран: новые силы Востока",
+      "questions": 20
+    },
+    {
+      "file": "s21.json",
+      "section": "§ 21 Индия в эпоху Великих Моголов",
+      "questions": 20
+    },
+    {
+      "file": "s22.json",
+      "section": "§ 22 Китай и Япония: в поисках стабильности",
+      "questions": 20
+    },
+    {
+      "file": "s23.json",
+      "section": "§ 23 Африка: разные судьбы государств",
+      "questions": 20
+    }
+  ]
+}

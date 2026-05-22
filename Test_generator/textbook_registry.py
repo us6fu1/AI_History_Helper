@@ -164,9 +164,62 @@ class TextbookRegistry:
             repaired.append(discovered)
             dirty = True
 
+        bank_display_keys = {
+            self._display_key(item)
+            for item in repaired
+            if item.get("kind") == "bank"
+        }
+        if bank_display_keys:
+            filtered: list[dict] = []
+            for item in repaired:
+                if item.get("kind") == "pdf" and self._display_key(item) in bank_display_keys:
+                    dirty = True
+                    continue
+                filtered.append(item)
+            repaired = filtered
+
+        deduped_by_display: dict[tuple[str, str], dict] = {}
+        for item in repaired:
+            key = (str(item.get("kind") or ""), self._display_key(item))
+            previous = deduped_by_display.get(key)
+            if previous is None:
+                deduped_by_display[key] = item
+                continue
+            dirty = True
+            if self._resource_priority(item) < self._resource_priority(previous):
+                deduped_by_display[key] = item
+        repaired = list(deduped_by_display.values())
+
         if dirty or repaired != self._data:
             self._data = repaired
             self._save()
+
+    @staticmethod
+    def _display_key(item: dict) -> str:
+        name = str(item.get("name") or "").strip()
+        fp = str(item.get("file") or "")
+        if not name and fp:
+            base = os.path.basename(os.path.normpath(fp))
+            name = os.path.splitext(base)[0] if item.get("kind") == "pdf" else base
+        return os.path.normcase(" ".join(name.replace("\u202f", " ").split())).lower()
+
+    @classmethod
+    def _resource_priority(cls, item: dict) -> tuple[int, int, str]:
+        fp = os.path.abspath(str(item.get("file") or ""))
+        bundled = min(
+            cls._path_distance(fp, cls.REPO_ROOT),
+            cls._path_distance(fp, cls.APP_DIR),
+        )
+        kind_order = 0 if item.get("kind") == "bank" else 1
+        return (bundled, kind_order, fp)
+
+    @staticmethod
+    def _path_distance(path: str, root: str) -> int:
+        try:
+            common = os.path.commonpath([os.path.abspath(path), os.path.abspath(root)])
+        except ValueError:
+            return 1
+        return 0 if os.path.normcase(common) == os.path.normcase(os.path.abspath(root)) else 1
 
     def add_bank(self, name: str, folder: str) -> bool:
         from question_bank import validate_bank_folder

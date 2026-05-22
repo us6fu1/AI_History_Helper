@@ -17,7 +17,9 @@ from app_paths import app_resource_dir, default_models_dir, repo_resource_dir, u
 logger = logging.getLogger(__name__)
 
 # Размер контекста по умолчанию (llama.cpp / GGUF): промпт + ответ.
-DEFAULT_N_CTX = 8000
+# 6144 устойчивее для ноутбуков 8 ядер / 16 GB RAM: тестовые промпты
+# помещаются, а KV-cache не забирает лишнюю память и не тормозит CPU.
+DEFAULT_N_CTX = 6144
 AUTO_N_GPU_LAYERS = -2
 
 
@@ -140,9 +142,29 @@ def detect_physical_cores() -> int:
         except Exception:
             pass
 
+        try:
+            out = subprocess.check_output(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-Command",
+                    "(Get-CimInstance Win32_Processor | "
+                    "Measure-Object -Property NumberOfCores -Sum).Sum",
+                ],
+                stderr=subprocess.DEVNULL,
+                timeout=3,
+            ).decode("ascii", errors="ignore")
+            total = int((out or "").strip())
+            if total > 0:
+                return total
+        except Exception:
+            pass
+
     # 4) Fallback: логические ядра / 2 (если их > 4), иначе как есть
     logical = os.cpu_count() or 4
-    return max(1, logical // 2 if logical > 4 else logical)
+    if logical <= 8:
+        return max(1, logical)
+    return max(1, logical // 2)
 
 
 def choose_auto_cpu_threads() -> int:
@@ -223,11 +245,35 @@ def choose_auto_context_tokens() -> int:
         return DEFAULT_N_CTX
     if ram_gb < 8:
         return 4096
-    if ram_gb < 12:
+    if ram_gb < 14:
         return 6144
-    if ram_gb < 24:
-        return 8000
+    if ram_gb < 20:
+        return 6144
+    if ram_gb < 32:
+        return 8192
     return 8192
+
+
+def choose_auto_batch_tokens() -> int:
+    """
+    Автоподбор n_batch/n_ubatch для prompt processing.
+    Для 8 ядер / 16 GB RAM 768 обычно заметно быстрее 256 и не требует
+    чрезмерной памяти на 3B-4B Q4/Q5 моделях.
+    """
+    env_batch = os.environ.get("HISTORY_TEST_N_BATCH")
+    if env_batch is not None and str(env_batch).strip():
+        try:
+            return max(128, min(1024, int(str(env_batch).strip())))
+        except ValueError:
+            pass
+
+    ram_gb = detect_total_ram_gb()
+    logical = detect_logical_cores()
+    if ram_gb is not None and ram_gb < 10:
+        return 384
+    if logical >= 8:
+        return 768
+    return 512
 
 
 def _run_short_command(args: list[str], timeout: float = 2.0) -> str:
@@ -372,9 +418,9 @@ class ModelRunner:
         "n_ctx": None,             # None → авто по оперативной памяти устройства
         "n_threads": None,       # None → авто (физические ядра)
         "n_gpu_layers": AUTO_N_GPU_LAYERS,  # -2 = авто; 0 = CPU; -1 = все слои на GPU
-        "n_batch": 768,          # 768 — sweet-spot между ускорением prompt
+        "n_batch": None,         # None → авто по RAM/CPU
                                  # processing и memory-bound потолком на DDR4.
-        "n_ubatch": 768,         # micro-batch такой же для согласованности.
+        "n_ubatch": None,        # micro-batch такой же для согласованности.
         "temperature": 0.3,
         "top_p": 0.9,
         "top_k": 40,
@@ -409,8 +455,8 @@ class ModelRunner:
         n_ctx: Optional[int] = None,
         n_threads: Optional[int] = None,
         n_gpu_layers: int = AUTO_N_GPU_LAYERS,
-        n_batch: int = 768,
-        n_ubatch: int = 768,
+        n_batch: Optional[int] = None,
+        n_ubatch: Optional[int] = None,
         use_mmap: bool = True,
         use_mlock: bool = False,
         progress_callback: Optional[Callable[[str], None]] = None,
@@ -433,6 +479,10 @@ class ModelRunner:
         """
         if n_ctx is None:
             n_ctx = choose_auto_context_tokens()
+        if n_batch is None or n_batch <= 0:
+            n_batch = choose_auto_batch_tokens()
+        if n_ubatch is None or n_ubatch <= 0:
+            n_ubatch = n_batch
 
         resolved_model_path = resolve_model_path(model_path)
         if resolved_model_path:

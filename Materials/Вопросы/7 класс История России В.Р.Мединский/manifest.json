@@ -1,0 +1,157 @@
+{
+  "textbook": "История России, 7 класс, В. Р. Мединский (вопросы по основному тексту учебника + введение)",
+  "total_files": 30,
+  "total_questions": 600,
+  "files": [
+    {
+      "file": "intro-v01.json",
+      "section": "Введение",
+      "questions": 20
+    },
+    {
+      "file": "s01-02.json",
+      "section": "§1–2 Россия в 1533—1547 гг",
+      "questions": 20
+    },
+    {
+      "file": "s03-04.json",
+      "section": "§3–4 Начало царствования Ивана IV",
+      "questions": 20
+    },
+    {
+      "file": "s05-06.json",
+      "section": "§5–6 Русское общество в XVI в",
+      "questions": 20
+    },
+    {
+      "file": "s07-08.json",
+      "section": "§7–8 Военные реформы Ивана IV",
+      "questions": 20
+    },
+    {
+      "file": "s09.json",
+      "section": "§9 Наследники Золотой Орды в середине XVI в",
+      "questions": 20
+    },
+    {
+      "file": "s10-11.json",
+      "section": "§10–11 Присоединение Поволжья",
+      "questions": 20
+    },
+    {
+      "file": "s12-13.json",
+      "section": "§12–13 Падение Избранной рады",
+      "questions": 20
+    },
+    {
+      "file": "s14-15.json",
+      "section": "§14–15 Завершение эпохи Ивана Грозного",
+      "questions": 20
+    },
+    {
+      "file": "s16-17.json",
+      "section": "§16–17 Россия при царе Фёдоре Ивановиче",
+      "questions": 20
+    },
+    {
+      "file": "s18.json",
+      "section": "§18 Развитие культуры в XVI в",
+      "questions": 20
+    },
+    {
+      "file": "s19.json",
+      "section": "§19 Духовная жизнь общества в XVI в",
+      "questions": 20
+    },
+    {
+      "file": "s20.json",
+      "section": "§20 В преддверии грозных испытаний: кризис",
+      "questions": 20
+    },
+    {
+      "file": "s21-22.json",
+      "section": "§21–22 Начало Смуты. Самозванец на троне",
+      "questions": 20
+    },
+    {
+      "file": "s23-24.json",
+      "section": "§23–24 Апогей Смуты. «Всеконечное разорение»",
+      "questions": 20
+    },
+    {
+      "file": "s25-26.json",
+      "section": "§25–26 Спасители Отечества",
+      "questions": 20
+    },
+    {
+      "file": "s27-28.json",
+      "section": "§27–28 Завершение Смуты",
+      "questions": 20
+    },
+    {
+      "file": "s29-30.json",
+      "section": "§29–30 «Куда соха ходила…»",
+      "questions": 20
+    },
+    {
+      "file": "s31.json",
+      "section": "§31 Сословия в XVII в.: верхи общества",
+      "questions": 20
+    },
+    {
+      "file": "s32.json",
+      "section": "§32 Сословия в XVII в.: низы общества",
+      "questions": 20
+    },
+    {
+      "file": "s33-34.json",
+      "section": "§33–34 Государственное устройство России",
+      "questions": 20
+    },
+    {
+      "file": "s35.json",
+      "section": "§35 Внутренняя политика царя",
+      "questions": 20
+    },
+    {
+      "file": "s36-37.json",
+      "section": "§36–37 «Государство правит по своей воли…»",
+      "questions": 20
+    },
+    {
+      "file": "s38-39.json",
+      "section": "§38–39 Русская церковь в XVII в",
+      "questions": 20
+    },
+    {
+      "file": "s40-41.json",
+      "section": "§40–41 Социальное противостояние в XVII в",
+      "questions": 20
+    },
+    {
+      "file": "s42-43.json",
+      "section": "§42–43 Внешняя политика России в XVII в",
+      "questions": 20
+    },
+    {
+      "file": "s44.json",
+      "section": "§44 «Встречь солнцу»: освоение Сибири",
+      "questions": 20
+    },
+    {
+      "file": "s45.json",
+      "section": "§45 Внутренняя политика",
+      "questions": 20
+    },
+    {
+      "file": "s46-47.json",
+      "section": "§46–47 Культура России в XVII в",
+      "questions": 20
+    },
+    {
+      "file": "s48.json",
+      "section": "§48 Мир человека XVII в",
+      "questions": 20
+    }
+  ]
+}

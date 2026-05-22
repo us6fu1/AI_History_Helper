@@ -45,6 +45,7 @@ Test_generator/assets/*_before_custom_icon.*
 Thumbs.db
 
 # Generated Office exports
+outputs/
 Materials/Тесты Docx/
 *.doc
 *.docx
