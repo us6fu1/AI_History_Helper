@@ -27,11 +27,13 @@ pip install "python-docx>=1.1.0"
 
 echo.
 echo [4/5] Установка llama-cpp-python (CPU-версия)...
-pip install --upgrade --only-binary=llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu "llama-cpp-python==0.3.23"
+set "FORCE_CMAKE=1"
+set "CMAKE_ARGS=-DGGML_NATIVE=OFF -DGGML_AVX=OFF -DGGML_AVX2=OFF -DGGML_AVX512=OFF -DGGML_AVX512_VBMI=OFF -DGGML_AVX512_VNNI=OFF -DGGML_FMA=OFF -DGGML_F16C=OFF -DGGML_CUDA=OFF -DGGML_BLAS=OFF"
+pip install --upgrade --no-cache-dir --no-binary=llama-cpp-python "llama-cpp-python==0.3.23"
 if errorlevel 1 (
     echo [ОШИБКА] Не удалось установить llama-cpp-python.
-    echo Проверьте версию Python (3.10/3.11/3.12) и доступ к интернету.
-    echo Установщик использует готовый CPU wheel и не собирает llama-cpp-python из исходников.
+    echo Проверьте версию Python (3.10/3.11/3.12), Visual Studio Build Tools и доступ к интернету.
+    echo Установщик собирает совместимую CPU-версию без AVX/AVX2/FMA/F16C.
     pause
     exit /b 1
 )
